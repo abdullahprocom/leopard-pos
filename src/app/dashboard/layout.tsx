@@ -96,7 +96,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 <span className="text-xl font-black text-white tracking-tight">
                   ERP <span className="text-blue-500">System</span>
                 </span>
-                <p className="text-[11px] font-bold text-slate-400 truncate max-w-[150px]">
+                <p className="text-[11px] font-bold text-slate-400 truncate max-w-[150px]" suppressHydrationWarning>
                   {storeName} ({businessTypeLabels[businessType] || 'سوبر ماركت'})
                 </p>
               </div>

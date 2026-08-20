@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/lib/db'
 import { generateTransferNumber } from '@/lib/finance'
-import { syncEngine } from '@/lib/sync-engine'
+import { syncEngine, DEFAULT_STORE_UUID, DEFAULT_BRANCH_UUID } from '@/lib/sync-engine'
 import { toast } from 'sonner'
-import { Save, ArrowRight, Trash, Search } from 'lucide-react'
+import { Save, ArrowRight, Trash, Search, ArrowLeftRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -30,10 +30,12 @@ interface TransferLineItem {
   available_stock: number
 }
 
+const WAREHOUSE_BRANCH_UUID = '00000000-0000-0000-0000-000000000004'
+
 export default function NewTransferPage() {
   const router = useRouter()
-  const [fromBranchId, setFromBranchId] = useState('branch-1')
-  const [toBranchId, setToBranchId] = useState('branch-2')
+  const [fromBranchId, setFromBranchId] = useState(DEFAULT_BRANCH_UUID)
+  const [toBranchId, setToBranchId] = useState(WAREHOUSE_BRANCH_UUID)
   const [notes, setNotes] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [lines, setLines] = useState<TransferLineItem[]>([])
@@ -88,7 +90,7 @@ export default function NewTransferPage() {
       const transferId = crypto.randomUUID()
       const now = new Date().toISOString()
       const transferNumber = generateTransferNumber()
-      const storeId = 'default'
+      const storeId = DEFAULT_STORE_UUID
 
       const transferRecord = {
         id: transferId,
@@ -96,7 +98,7 @@ export default function NewTransferPage() {
         from_branch_id: fromBranchId,
         to_branch_id: toBranchId,
         transfer_number: transferNumber,
-        status: 'completed',
+        status: 'completed' as const,
         notes: notes.trim(),
         created_at: now,
         completed_at: now,
@@ -141,7 +143,7 @@ export default function NewTransferPage() {
             total: 0,
             source_table: 'stock_transfers',
             source_id: transferId,
-            notes: `تحويل صادر برقم ${transferNumber} إلى الفرع الثاني`,
+            notes: `تحويل صادر برقم ${transferNumber}`,
             created_at: now,
           }
           await db.stock_ledger.add(ledgerOut)
@@ -156,6 +158,7 @@ export default function NewTransferPage() {
             })
           } else {
             await db.stock_balances.add({
+              id: crypto.randomUUID(),
               store_id: storeId,
               item_id: line.item_id,
               branch_id: toBranchId,
@@ -177,7 +180,7 @@ export default function NewTransferPage() {
             total: 0,
             source_table: 'stock_transfers',
             source_id: transferId,
-            notes: `تحويل وارد برقم ${transferNumber} من الفرع الأول`,
+            notes: `تحويل وارد برقم ${transferNumber}`,
             created_at: now,
           }
           await db.stock_ledger.add(ledgerIn)
@@ -197,110 +200,116 @@ export default function NewTransferPage() {
   }
 
   return (
-    <div className="space-y-6 pb-20" dir="rtl">
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-4">
+    <div className="space-y-6 pb-28 select-none" dir="rtl">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => router.push('/dashboard/transfers')} className="h-10 w-10 shrink-0">
             <ArrowRight className="h-6 w-6" />
           </Button>
-          <h1 className="text-3xl font-bold tracking-tight">تحويل مخزني جديد</h1>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white">تحويل ونقل مخزني</h1>
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">نقل البضائع والأرصدة بين الفروع والمستودعات</p>
+          </div>
         </div>
-        <Button onClick={handleSaveTransfer} size="lg" disabled={isSubmitting} className="gap-2 font-bold px-8 h-12 bg-cyan-600 hover:bg-cyan-700 text-white">
+        <Button onClick={handleSaveTransfer} size="lg" disabled={isSubmitting} className="gap-2 font-black px-8 h-12 bg-cyan-600 hover:bg-cyan-700 active:bg-cyan-800 text-white rounded-xl shadow-md shadow-cyan-600/20 cursor-pointer">
           <Save className="h-5 w-5 ml-1" />
-          {isSubmitting ? 'جاري التحويل...' : 'تنفيذ التحويل المخزني'}
+          {isSubmitting ? 'جاري التحويل...' : 'تنفيذ وترحيل التحويل'}
         </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>من فرع / مخزن</CardTitle>
+        <Card className="border-slate-200/90 dark:border-slate-800">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base text-slate-900 dark:text-white">من فرع / مخزن (المصدر)</CardTitle>
           </CardHeader>
           <CardContent>
             <Select value={fromBranchId} onValueChange={setFromBranchId}>
-              <SelectTrigger className="h-12">
+              <SelectTrigger className="h-12 text-sm font-bold bg-slate-50/80 dark:bg-slate-800/80 rounded-xl">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="branch-1">الفرع الرئيسي</SelectItem>
-                <SelectItem value="branch-2">مخزن البضائع</SelectItem>
+              <SelectContent className="rounded-xl shadow-xl dark:bg-slate-900 dark:border-slate-800">
+                <SelectItem value={DEFAULT_BRANCH_UUID}>الفرع الرئيسي / صالة العرض</SelectItem>
+                <SelectItem value={WAREHOUSE_BRANCH_UUID}>المستودع والمخزن المركزي</SelectItem>
               </SelectContent>
             </Select>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>إلى فرع / مخزن</CardTitle>
+        <Card className="border-slate-200/90 dark:border-slate-800">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base text-slate-900 dark:text-white">إلى فرع / مخزن (الوجهة)</CardTitle>
           </CardHeader>
           <CardContent>
             <Select value={toBranchId} onValueChange={setToBranchId}>
-              <SelectTrigger className="h-12">
+              <SelectTrigger className="h-12 text-sm font-bold bg-slate-50/80 dark:bg-slate-800/80 rounded-xl">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="branch-2">مخزن البضائع</SelectItem>
-                <SelectItem value="branch-1">الفرع الرئيسي</SelectItem>
+              <SelectContent className="rounded-xl shadow-xl dark:bg-slate-900 dark:border-slate-800">
+                <SelectItem value={WAREHOUSE_BRANCH_UUID}>المستودع والمخزن المركزي</SelectItem>
+                <SelectItem value={DEFAULT_BRANCH_UUID}>الفرع الرئيسي / صالة العرض</SelectItem>
               </SelectContent>
             </Select>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
+      <Card className="border-slate-200/90 dark:border-slate-800 shadow-sm">
         <CardHeader>
-          <CardTitle>الأصناف المراد تحويلها</CardTitle>
+          <CardTitle className="text-slate-900 dark:text-white">الأصناف المراد تحويلها</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="relative max-w-md">
-            <Search className="absolute right-3.5 top-3.5 h-5 w-5 text-muted-foreground" />
+          
+          {/* Isolated Search Container with high z-index and solid popup */}
+          <div className="relative max-w-lg z-30">
+            <Search className="absolute right-3.5 top-3.5 h-5 w-5 text-slate-400" />
             <Input 
-              placeholder="ابحث عن صنف لإضافته..." 
-              className="pr-11 h-12 text-base"
+              placeholder="ابحث باسم الصنف أو امسح الباركود..." 
+              className="pr-11 h-12 text-base font-bold bg-slate-50/80 dark:bg-slate-800/80 rounded-xl"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
             {searchResults && searchResults.length > 0 && (
-              <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-auto">
+              <div className="absolute top-full right-0 left-0 mt-2 z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl max-h-60 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
                 {searchResults.map(item => (
                   <div 
                     key={item.id} 
-                    className="p-3 hover:bg-muted cursor-pointer flex justify-between border-b last:border-0"
+                    className="p-3.5 hover:bg-blue-50 dark:hover:bg-slate-800 cursor-pointer flex justify-between items-center transition-colors"
                     onClick={() => handleAddItem(item)}
                   >
-                    <span className="font-bold">{item.name}</span>
-                    <span className="text-muted-foreground font-mono">{item.sku || 'إضافة'}</span>
+                    <span className="font-bold text-slate-900 dark:text-white text-sm">{item.name}</span>
+                    <span className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-2.5 py-1 rounded-md font-mono font-bold">{item.sku || 'اختيار'}</span>
                   </div>
                 ))}
               </div>
             )}
           </div>
 
-          <div className="border rounded-md overflow-x-auto">
+          {/* Table Container */}
+          <div className="border border-slate-200/90 dark:border-slate-800 rounded-xl overflow-hidden">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>الصنف</TableHead>
-                  <TableHead className="w-36 text-center">الكمية المحولة</TableHead>
-                  <TableHead className="w-16"></TableHead>
-                </TableRow>
+                <tr className="border-b border-slate-200/90 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-xs font-black text-slate-500 dark:text-slate-400">
+                  <th className="p-3.5 text-right">الصنف</th>
+                  <th className="p-3.5 w-40 text-center">الكمية المحولة</th>
+                  <th className="p-3.5 w-16 text-center">حذف</th>
+                </tr>
               </TableHeader>
               <TableBody>
                 {lines.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={3} className="text-center h-24 text-muted-foreground text-base">
-                      لم يتم إضافة أصناف للتحويل بعد
+                    <TableCell colSpan={3} className="text-center h-28 text-slate-400 text-sm font-semibold">
+                      لم يتم إضافة أصناف للتحويل بعد - ابحث واختر من القائمة أعلاه
                     </TableCell>
                   </TableRow>
                 ) : (
                   lines.map(line => (
-                    <TableRow key={line.id}>
-                      <TableCell className="font-bold text-base">{line.item_name}</TableCell>
+                    <TableRow key={line.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                      <TableCell className="font-bold text-base text-slate-900 dark:text-white">{line.item_name}</TableCell>
                       <TableCell className="text-center">
                         <Input 
                           type="number"
                           min="1"
-                          className="w-28 h-10 font-bold text-center mx-auto"
+                          className="w-28 h-10 font-bold font-mono text-center mx-auto bg-slate-50 dark:bg-slate-800 rounded-lg"
                           value={line.quantity}
                           onChange={(e) => {
                             const val = Math.max(1, parseInt(e.target.value) || 1)
@@ -308,8 +317,8 @@ export default function NewTransferPage() {
                           }}
                         />
                       </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="icon" onClick={() => removeLine(line.id)} className="text-destructive hover:bg-destructive/10">
+                      <TableCell className="text-center">
+                        <Button variant="ghost" size="icon" onClick={() => removeLine(line.id)} className="text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40">
                           <Trash className="h-4 w-4" />
                         </Button>
                       </TableCell>

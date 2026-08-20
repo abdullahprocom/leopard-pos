@@ -271,15 +271,15 @@ export default function NewPurchasePage() {
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                   {items && items.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-auto">
+                    <div className="absolute top-full right-0 left-0 mt-2 z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl max-h-60 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
                       {items.map(item => (
                         <div 
                           key={item.id} 
-                          className="p-3 hover:bg-muted cursor-pointer flex justify-between border-b last:border-0"
+                          className="p-3.5 hover:bg-blue-50 dark:hover:bg-slate-800/80 cursor-pointer flex justify-between items-center transition-colors"
                           onClick={() => handleAddItem(item)}
                         >
-                          <span className="font-bold">{item.name}</span>
-                          <span className="text-muted-foreground font-mono">{item.sku || `${item.buy_price} ج.م`}</span>
+                          <span className="font-bold text-slate-900 dark:text-white text-sm">{item.name}</span>
+                          <span className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-2.5 py-1 rounded-md font-mono font-bold">{item.sku || `${item.buy_price} ج.م`}</span>
                         </div>
                       ))}
                     </div>

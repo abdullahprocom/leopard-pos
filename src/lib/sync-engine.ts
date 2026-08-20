@@ -64,15 +64,21 @@ class SyncEngine {
     if (!payload || typeof payload !== 'object') return payload;
     const clean = { ...payload };
 
-    // Ensure valid UUIDs for UUID columns
+    // Ensure valid UUIDs for primary and foreign key columns
     if (clean.id && !isValidUUID(clean.id)) {
-      clean.id = DEFAULT_STORE_UUID;
+      clean.id = crypto.randomUUID();
     }
     if (clean.store_id && !isValidUUID(clean.store_id)) {
       clean.store_id = DEFAULT_STORE_UUID;
     }
     if (clean.branch_id && !isValidUUID(clean.branch_id)) {
       clean.branch_id = DEFAULT_BRANCH_UUID;
+    }
+    if (clean.from_branch_id && !isValidUUID(clean.from_branch_id)) {
+      clean.from_branch_id = DEFAULT_BRANCH_UUID;
+    }
+    if (clean.to_branch_id && !isValidUUID(clean.to_branch_id)) {
+      clean.to_branch_id = DEFAULT_BRANCH_UUID;
     }
     if (clean.owner_id && !isValidUUID(clean.owner_id)) {
       clean.owner_id = DEFAULT_USER_UUID;
@@ -85,6 +91,39 @@ class SyncEngine {
     }
     if (clean.category_id && !isValidUUID(clean.category_id)) {
       delete clean.category_id;
+    }
+    if (clean.role_id && !isValidUUID(clean.role_id)) {
+      delete clean.role_id;
+    }
+    if (clean.shift_id && !isValidUUID(clean.shift_id)) {
+      delete clean.shift_id;
+    }
+    if (clean.cashier_id && !isValidUUID(clean.cashier_id)) {
+      delete clean.cashier_id;
+    }
+    if (clean.source_id && !isValidUUID(clean.source_id)) {
+      delete clean.source_id;
+    }
+    if (clean.purchase_id && !isValidUUID(clean.purchase_id)) {
+      delete clean.purchase_id;
+    }
+    if (clean.sale_id && !isValidUUID(clean.sale_id)) {
+      delete clean.sale_id;
+    }
+    if (clean.return_id && !isValidUUID(clean.return_id)) {
+      delete clean.return_id;
+    }
+    if (clean.transfer_id && !isValidUUID(clean.transfer_id)) {
+      delete clean.transfer_id;
+    }
+    if (clean.session_id && !isValidUUID(clean.session_id)) {
+      delete clean.session_id;
+    }
+    if (clean.purchase_line_id && !isValidUUID(clean.purchase_line_id)) {
+      delete clean.purchase_line_id;
+    }
+    if (clean.sale_line_id && !isValidUUID(clean.sale_line_id)) {
+      delete clean.sale_line_id;
     }
 
     return clean;
