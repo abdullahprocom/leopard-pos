@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { BusinessType } from './types'
+import { DEFAULT_STORE_UUID, DEFAULT_BRANCH_UUID, DEFAULT_USER_UUID } from './sync-engine'
 
 interface StoreContextType {
   storeId: string | null
@@ -27,10 +28,10 @@ interface StoreContextType {
 const StoreContext = createContext<StoreContextType | undefined>(undefined)
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [storeId, setStoreId] = useState<string | null>('default-store-001')
-  const [branchId, setBranchId] = useState<string | null>('default-branch-001')
-  const [userId, setUserId] = useState<string | null>('admin-cashier-001')
-  const [storeName, setStoreNameState] = useState<string>('APR Supermarket')
+  const [storeId, setStoreId] = useState<string | null>(DEFAULT_STORE_UUID)
+  const [branchId, setBranchId] = useState<string | null>(DEFAULT_BRANCH_UUID)
+  const [userId, setUserId] = useState<string | null>(DEFAULT_USER_UUID)
+  const [storeName, setStoreNameState] = useState<string>('ERP Supermarket')
   const [businessType, setBusinessTypeState] = useState<BusinessType>('supermarket')
   const [activationToken, setActivationToken] = useState<string | null>(null)
   const [isActivated, setIsActivated] = useState<boolean>(true)
@@ -48,24 +49,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     // 2. Load stored business profile & activation token from localStorage
     if (typeof window !== 'undefined') {
-      const savedType = localStorage.getItem('apr_business_type') as BusinessType | null
+      const savedType = (localStorage.getItem('erp_business_type') || localStorage.getItem('apr_business_type')) as BusinessType | null
       if (savedType) {
         setBusinessTypeState(savedType)
       }
 
-      const savedName = localStorage.getItem('apr_store_name')
+      const savedName = localStorage.getItem('erp_store_name') || localStorage.getItem('apr_store_name')
       if (savedName) {
         setStoreNameState(savedName)
       }
 
-      const savedToken = localStorage.getItem('apr_activation_token')
+      const savedToken = localStorage.getItem('erp_activation_token') || localStorage.getItem('apr_activation_token')
       if (savedToken) {
         setActivationToken(savedToken)
         setIsActivated(true)
       } else {
         // Auto-generate local offline development token
-        const devToken = 'APR-OFFLINE-ACT-998822'
-        localStorage.setItem('apr_activation_token', devToken)
+        const devToken = 'ERP-OFFLINE-ACT-998822'
+        localStorage.setItem('erp_activation_token', devToken)
         setActivationToken(devToken)
         setIsActivated(true)
       }
@@ -80,14 +81,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const setBusinessType = (type: BusinessType) => {
     setBusinessTypeState(type)
     if (typeof window !== 'undefined') {
-      localStorage.setItem('apr_business_type', type)
+      localStorage.setItem('erp_business_type', type)
     }
   }
 
   const setStoreName = (name: string) => {
     setStoreNameState(name)
     if (typeof window !== 'undefined') {
-      localStorage.setItem('apr_store_name', name)
+      localStorage.setItem('erp_store_name', name)
     }
   }
 
@@ -95,14 +96,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setActivationToken(token)
     setIsActivated(true)
     if (typeof window !== 'undefined') {
-      localStorage.setItem('apr_activation_token', token)
+      localStorage.setItem('erp_activation_token', token)
       if (name) {
         setStoreNameState(name)
-        localStorage.setItem('apr_store_name', name)
+        localStorage.setItem('erp_store_name', name)
       }
       if (type) {
         setBusinessTypeState(type)
-        localStorage.setItem('apr_business_type', type)
+        localStorage.setItem('erp_business_type', type)
       }
     }
   }

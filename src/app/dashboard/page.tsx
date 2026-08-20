@@ -145,7 +145,7 @@ export default function DashboardPage() {
       <div className="bg-white dark:bg-slate-900/90 rounded-2xl p-5 sm:p-6 text-slate-900 dark:text-white border border-slate-200/90 dark:border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm transition-colors">
         <div>
           <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-            منظومة APR System المحاسبية
+            منظومة ERP المحاسبية
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1 text-xs font-semibold">
             لوحة العمليات السريعة وإدارة الكاشير والمخازن

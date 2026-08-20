@@ -4,8 +4,8 @@ import { StoreProvider } from "@/lib/store-context";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "APR System - منظومة الكاشير وإدارة المخازن المتكاملة",
-  description: "منظومة APR System - نظام محاسبي متكامل للسوبر ماركت والمخازن العامة مع دعم العمل أوفلاين والمزامنة السحابية",
+  title: "ERP System - منظومة الكاشير وإدارة المخازن المتكاملة",
+  description: "منظومة ERP المحاسبية - نظام محاسبي متكامل للسوبر ماركت والمخازن العامة مع دعم العمل أوفلاين والمزامنة السحابية",
   manifest: "/manifest.json",
 };
 

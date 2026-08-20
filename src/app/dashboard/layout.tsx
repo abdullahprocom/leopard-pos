@@ -88,13 +88,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <div className="flex items-center gap-3 overflow-hidden">
             <img 
               src="/icon.png" 
-              alt="APR System" 
+              alt="ERP System" 
               className="w-10 h-10 rounded-xl object-cover shadow-lg shadow-blue-600/30 border border-blue-500/30 shrink-0" 
             />
             {!isDesktopCollapsed && (
               <div className="transition-opacity duration-200">
                 <span className="text-xl font-black text-white tracking-tight">
-                  APR <span className="text-blue-500">System</span>
+                  ERP <span className="text-blue-500">System</span>
                 </span>
                 <p className="text-[11px] font-bold text-slate-400 truncate max-w-[150px]">
                   {storeName} ({businessTypeLabels[businessType] || 'سوبر ماركت'})
@@ -166,7 +166,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 <span>{isActivated ? 'مرخص محلياً' : 'تجريبي'}</span>
               </div>
               <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded-md font-mono">
-                APR v2.0
+                ERP v2.0
               </span>
             </div>
           ) : (

@@ -1,7 +1,7 @@
 {
-  "name": "APR System - منظومة الكاشير وإدارة المخازن",
-  "short_name": "APR System",
-  "description": "منظومة APR System المحاسبية المتكاملة لنقاط البيع وإدارة المخازن العامة والسوبر ماركت",
+  "name": "ERP System - منظومة الكاشير وإدارة المخازن",
+  "short_name": "ERP System",
+  "description": "منظومة ERP المحاسبية المتكاملة لنقاط البيع وإدارة المخازن العامة والسوبر ماركت",
   "start_url": "/dashboard",
   "display": "standalone",
   "orientation": "any",

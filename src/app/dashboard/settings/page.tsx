@@ -85,7 +85,7 @@ export default function SettingsPage() {
         activateOfflineSystem(inputToken.trim(), localStoreName.trim(), localBusinessType)
       }
 
-      toast.success('تم حفظ كافة إعدادات منظومة APR بنجاح')
+      toast.success('تم حفظ كافة إعدادات منظومة ERP بنجاح')
     } catch (err: any) {
       toast.error('حدث خطأ أثناء الحفظ: ' + err.message)
     } finally {
@@ -114,7 +114,7 @@ export default function SettingsPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-sm transition-colors">
         <div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-            إعدادات منظومة APR System
+            إعدادات منظومة ERP المحاسبية
           </h1>
           <p className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400 mt-0.5">
             تخصيص نوع النشاط التجاري، التوثيق والترخيص الأوفلاين، الطابعات، والربط السحابي

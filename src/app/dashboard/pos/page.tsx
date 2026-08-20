@@ -368,7 +368,7 @@ export default function POSPage() {
               <ShoppingCart className="w-5 h-5 text-blue-600 dark:text-blue-400" />
               <span>محتويات الفاتورة الحالية ({cart.length} أصناف)</span>
             </div>
-            <span className="text-xs font-mono text-slate-400 font-bold">APR POS Terminal</span>
+            <span className="text-xs font-mono text-slate-400 font-bold">ERP POS Terminal</span>
           </div>
 
           <div className="flex-1 overflow-y-auto p-2">

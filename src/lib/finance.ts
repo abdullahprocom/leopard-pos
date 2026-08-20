@@ -88,7 +88,7 @@ export function generateSequenceNumber(prefix: string): string {
 
 /** Generate invoice number */
 export function generateInvoiceNumber(): string {
-  return generateSequenceNumber('APR-INV')
+  return generateSequenceNumber('ERP-INV')
 }
 
 /** Generate sale number (alias for invoice number) */
@@ -96,22 +96,22 @@ export const generateSaleNumber = generateInvoiceNumber
 
 /** Generate purchase number */
 export function generatePurchaseNumber(): string {
-  return generateSequenceNumber('APR-PUR')
+  return generateSequenceNumber('ERP-PUR')
 }
 
 /** Generate return number */
 export function generateReturnNumber(type: 'sale' | 'purchase'): string {
-  return generateSequenceNumber(type === 'sale' ? 'APR-SRT' : 'APR-PRT')
+  return generateSequenceNumber(type === 'sale' ? 'ERP-SRT' : 'ERP-PRT')
 }
 
 /** Generate transfer number */
 export function generateTransferNumber(): string {
-  return generateSequenceNumber('APR-TRF')
+  return generateSequenceNumber('ERP-TRF')
 }
 
 /** Generate stocktaking number */
 export function generateStocktakingNumber(): string {
-  return generateSequenceNumber('APR-STK')
+  return generateSequenceNumber('ERP-STK')
 }
 
 /** Format currency with Arabic locale */
