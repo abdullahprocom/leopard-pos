@@ -86,9 +86,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         {/* Logo & Close Button */}
         <div className="h-20 flex items-center justify-between px-5 border-b border-slate-800/60 shrink-0">
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/25 border border-white/10 shrink-0">
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
+            <img 
+              src="/icon.png" 
+              alt="APR System" 
+              className="w-10 h-10 rounded-xl object-cover shadow-lg shadow-blue-600/30 border border-blue-500/30 shrink-0" 
+            />
             {!isDesktopCollapsed && (
               <div className="transition-opacity duration-200">
                 <span className="text-xl font-black text-white tracking-tight">
