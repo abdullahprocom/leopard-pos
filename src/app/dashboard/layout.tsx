@@ -204,11 +204,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             </div>
           </div>
           
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-xs font-bold">
-              <span>نشاط:</span>
-              <span>{businessTypeLabels[businessType] || 'سوبر ماركت'}</span>
-            </div>
+          <div className="flex items-center gap-3">
             <OnlineStatus />
             <ThemeToggle />
           </div>
