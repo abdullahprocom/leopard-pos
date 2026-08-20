@@ -105,6 +105,7 @@ export interface ItemUnit {
 }
 
 export interface StockBalance {
+  id?: string
   store_id: string
   item_id: string
   branch_id: string
@@ -198,6 +199,16 @@ export interface PurchaseReturn {
   updated_at: string
 }
 
+export interface PurchaseReturnLine {
+  id: string
+  store_id: string
+  return_id: string
+  item_id: string
+  quantity: number
+  buy_price: number
+  total: number
+}
+
 // ============================================================
 // Customers & Sales
 // ============================================================
@@ -269,6 +280,16 @@ export interface SalesReturn {
   updated_at: string
 }
 
+export interface SalesReturnLine {
+  id: string
+  store_id: string
+  return_id: string
+  item_id: string
+  quantity: number
+  unit_price: number
+  total: number
+}
+
 // ============================================================
 // Operations
 // ============================================================
@@ -337,6 +358,49 @@ export interface RolePermission {
   resource_type: ResourceType
   resource_key: string
   allowed: boolean
+}
+
+export interface Stocktaking {
+  id: string
+  store_id: string
+  branch_id: string
+  stocktaking_number: string
+  status: StocktakingStatus
+  notes?: string
+  created_by?: string
+  created_at: string
+  completed_at?: string
+}
+
+export interface StocktakingLine {
+  id: string
+  store_id: string
+  stocktaking_id: string
+  item_id: string
+  system_qty: number
+  actual_qty: number
+  difference: number
+}
+
+export interface StockTransfer {
+  id: string
+  store_id: string
+  from_branch_id: string
+  to_branch_id: string
+  transfer_number: string
+  status: TransferStatus
+  notes?: string
+  created_by?: string
+  created_at: string
+  completed_at?: string
+}
+
+export interface StockTransferLine {
+  id: string
+  store_id: string
+  transfer_id: string
+  item_id: string
+  quantity: number
 }
 
 export interface SyncOperation {

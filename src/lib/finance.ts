@@ -59,6 +59,9 @@ export function generateInvoiceNumber(): string {
   return generateSequenceNumber('INV')
 }
 
+/** Generate sale number (alias for invoice number) */
+export const generateSaleNumber = generateInvoiceNumber
+
 /** Generate purchase number */
 export function generatePurchaseNumber(): string {
   return generateSequenceNumber('PUR')

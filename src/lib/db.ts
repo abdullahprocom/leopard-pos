@@ -5,7 +5,7 @@ import Dexie, { type EntityTable } from 'dexie'
 import type {
   Store, Branch, Category, Item, ItemBarcode, ItemUnit,
   StockBalance, StockLedgerEntry, Supplier, Purchase, PurchaseLine,
-  PurchaseReturn, Customer, Sale, SaleLine, SalesReturn,
+  PurchaseReturn, PurchaseReturnLine, Customer, Sale, SaleLine, SalesReturn, SalesReturnLine,
   CashTransaction, CashierShift, Employee, Role, RolePermission,
   SyncOperation, Stocktaking, StockTransfer
 } from '@/lib/types'
@@ -92,12 +92,14 @@ class LeopardDatabase extends Dexie {
   purchases!: EntityTable<Purchase, 'id'>
   purchase_lines!: EntityTable<PurchaseLine, 'id'>
   purchase_returns!: EntityTable<PurchaseReturn, 'id'>
+  purchase_return_lines!: EntityTable<PurchaseReturnLine, 'id'>
 
   // Customers & Sales
   customers!: EntityTable<Customer, 'id'>
   sales!: EntityTable<Sale, 'id'>
   sale_lines!: EntityTable<SaleLine, 'id'>
   sales_returns!: EntityTable<SalesReturn, 'id'>
+  sales_return_lines!: EntityTable<SalesReturnLine, 'id'>
 
   // Operations
   cash_transactions!: EntityTable<CashTransaction, 'id'>
@@ -119,42 +121,44 @@ class LeopardDatabase extends Dexie {
   constructor() {
     super('LeopardPOS')
 
-    this.version(1).stores({
+    this.version(2).stores({
       // Foundation
-      stores: 'id, owner_id',
-      branches: 'id, store_id, code, is_default',
+      stores: 'id, owner_id, created_at',
+      branches: 'id, store_id, code, is_default, created_at',
 
       // Inventory - key indexes for fast search
-      categories: 'id, store_id, name, parent_id',
-      items: 'id, store_id, name, sku, category_id, status, search_text',
-      item_barcodes: 'id, store_id, item_id, barcode',
+      categories: 'id, store_id, name, parent_id, created_at',
+      items: 'id, store_id, name, sku, category_id, status, search_text, created_at',
+      item_barcodes: 'id, store_id, item_id, barcode, created_at',
       item_units: 'id, store_id, item_id, level',
       stock_balances: '[store_id+item_id+branch_id], store_id, item_id, branch_id',
       stock_ledger: 'id, store_id, item_id, branch_id, movement_type, created_at',
 
       // Suppliers & Purchases
-      suppliers: 'id, store_id, name',
-      purchases: 'id, store_id, purchase_number, supplier_name, status, purchase_date',
+      suppliers: 'id, store_id, name, created_at',
+      purchases: 'id, store_id, purchase_number, supplier_name, status, purchase_date, created_at',
       purchase_lines: 'id, store_id, purchase_id, item_id',
-      purchase_returns: 'id, store_id, return_number',
+      purchase_returns: 'id, store_id, return_number, created_at',
+      purchase_return_lines: 'id, store_id, return_id, item_id',
 
       // Customers & Sales
-      customers: 'id, store_id, name, phone',
-      sales: 'id, store_id, invoice_number, status, sale_date, device_id',
+      customers: 'id, store_id, name, phone, created_at',
+      sales: 'id, store_id, invoice_number, status, sale_date, device_id, created_at',
       sale_lines: 'id, store_id, sale_id, item_id',
-      sales_returns: 'id, store_id, return_number, sale_id',
+      sales_returns: 'id, store_id, return_number, sale_id, created_at',
+      sales_return_lines: 'id, store_id, return_id, item_id',
 
       // Operations
       cash_transactions: 'id, store_id, branch_id, transaction_type, created_at',
       cashier_shifts: 'id, store_id, branch_id, status',
-      stocktaking: 'id, store_id, stocktaking_number, status',
+      stocktaking: 'id, store_id, stocktaking_number, status, created_at',
       stocktaking_lines: 'id, store_id, stocktaking_id, item_id',
-      stock_transfers: 'id, store_id, transfer_number, status',
+      stock_transfers: 'id, store_id, transfer_number, status, created_at',
       stock_transfer_lines: 'id, store_id, transfer_id, item_id',
 
       // RBAC
-      employees: 'id, store_id, auth_user_id, role_id',
-      roles: 'id, store_id, name',
+      employees: 'id, store_id, auth_user_id, role_id, created_at',
+      roles: 'id, store_id, name, created_at',
       role_permissions: 'id, role_id, [resource_type+resource_key]',
 
       // Sync queue - auto-increment id for ordering
