@@ -3,10 +3,10 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/lib/db'
-import { generateReturnNumber } from '@/lib/finance'
-import { syncEngine } from '@/lib/sync-engine'
+import { generateReturnNumber, cleanPositivePrice, money } from '@/lib/finance'
+import { syncEngine, DEFAULT_STORE_UUID, DEFAULT_BRANCH_UUID } from '@/lib/sync-engine'
 import { toast } from 'sonner'
-import { Search, Undo2, AlertCircle, Trash, FileText, RotateCcw, Plus, CheckCircle2 } from 'lucide-react'
+import { Search, Undo2, AlertCircle, Trash, FileText, RotateCcw, Plus, Minus, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -16,6 +16,7 @@ import type { SalesReturn, SalesReturnLine, CashTransaction } from '@/lib/types'
 export default function SalesReturnsPage() {
   const [invoiceNumber, setInvoiceNumber] = useState('')
   const [invoiceSearchTerm, setInvoiceSearchTerm] = useState('')
+  const [invoiceReturnQuantities, setInvoiceReturnQuantities] = useState<Record<string, number>>({})
   
   // For free return
   const [itemSearchTerm, setItemSearchTerm] = useState('')
@@ -28,29 +29,39 @@ export default function SalesReturnsPage() {
     const sale = await db.sales.where('invoice_number').equals(invoiceSearchTerm.trim()).first()
     if (!sale) return null
     const lines = await db.sale_lines.where('sale_id').equals(sale.id).toArray()
-    const enrichedLines = lines.map(line => ({
-      ...line,
-      return_qty: 0
-    }))
-    return { sale, lines: enrichedLines }
+    return { sale, lines }
   }, [invoiceSearchTerm])
 
   // Search items for free return
   const searchResults = useLiveQuery(async () => {
-    if (itemSearchTerm.length < 2) return []
+    if (itemSearchTerm.length < 1) return []
     const q = itemSearchTerm.toLowerCase()
     return await db.items
       .filter(item => (item.search_text || item.name || '').toLowerCase().includes(q))
-      .limit(5)
+      .limit(6)
       .toArray()
   }, [itemSearchTerm]) || []
+
+  // List existing sales returns
+  const returnsList = useLiveQuery(
+    () => db.sales_returns.orderBy('created_at').reverse().toArray()
+  ) || []
 
   const handleSearchInvoice = () => {
     if (!invoiceNumber.trim()) {
       toast.error('يرجى إدخال رقم الفاتورة للبحث')
       return
     }
+    setInvoiceReturnQuantities({})
     setInvoiceSearchTerm(invoiceNumber.trim())
+  }
+
+  const handleInvoiceQtyChange = (lineId: string, qty: number, maxQty: number) => {
+    const validQty = Math.min(Math.max(0, qty), maxQty)
+    setInvoiceReturnQuantities(prev => ({
+      ...prev,
+      [lineId]: validQty
+    }))
   }
 
   const handleAddFreeReturnItem = (item: any) => {
@@ -64,7 +75,7 @@ export default function SalesReturnsPage() {
       {
         item_id: item.id,
         name: item.name,
-        unit_price: item.sell_price,
+        unit_price: cleanPositivePrice(item.sell_price),
         return_qty: 1,
       }
     ])
@@ -84,24 +95,18 @@ export default function SalesReturnsPage() {
     setFreeReturnItems(prev => prev.filter(item => item.item_id !== itemId))
   }
 
-  const handleInvoiceQtyChange = (lineId: string, qty: number, maxQty: number) => {
-    if (!currentInvoice) return
-    const validQty = Math.min(Math.max(0, qty), maxQty)
-    currentInvoice.lines = currentInvoice.lines.map(line => {
-      if (line.id === lineId) {
-        return { ...line, return_qty: validQty }
-      }
-      return line
-    })
-    setInvoiceSearchTerm(invoiceSearchTerm + ' ')
-    setTimeout(() => setInvoiceSearchTerm(invoiceSearchTerm.trim()), 10)
-  }
-
   const submitInvoiceReturn = async () => {
     if (!currentInvoice) return
-    const linesToReturn = currentInvoice.lines.filter(l => l.return_qty > 0)
+
+    const linesToReturn = currentInvoice.lines
+      .map(line => ({
+        ...line,
+        return_qty: invoiceReturnQuantities[line.id] || 0
+      }))
+      .filter(l => l.return_qty > 0)
+
     if (linesToReturn.length === 0) {
-      toast.error('يرجى تحديد كمية للإرجاع لصنف واحد على الأقل')
+      toast.error('يرجى تحديد كمية للإرجاع (أكبر من 0) لصنف واحد على الأقل')
       return
     }
 
@@ -110,10 +115,10 @@ export default function SalesReturnsPage() {
       const now = new Date().toISOString()
       const returnNumber = generateReturnNumber('sale')
       const returnId = crypto.randomUUID()
-      const storeId = currentInvoice.sale.store_id || 'default'
-      const branchId = 'default'
+      const storeId = currentInvoice.sale.store_id || DEFAULT_STORE_UUID
+      const branchId = currentInvoice.sale.branch_id || DEFAULT_BRANCH_UUID
 
-      const totalRefund = linesToReturn.reduce((sum, l) => sum + (l.return_qty * l.unit_price), 0)
+      const totalRefund = money(linesToReturn.reduce((sum, l) => sum + (l.return_qty * l.unit_price), 0))
 
       const salesReturn: SalesReturn = {
         id: returnId,
@@ -122,7 +127,7 @@ export default function SalesReturnsPage() {
         sale_id: currentInvoice.sale.id,
         return_number: returnNumber,
         invoice_number: currentInvoice.sale.invoice_number,
-        customer_name: currentInvoice.sale.customer_name,
+        customer_name: currentInvoice.sale.customer_name || 'عميل نقدي',
         return_type: 'invoice',
         total: totalRefund,
         refund_amount: totalRefund,
@@ -144,11 +149,12 @@ export default function SalesReturnsPage() {
             item_id: line.item_id,
             quantity: line.return_qty,
             unit_price: line.unit_price,
-            total: line.return_qty * line.unit_price,
+            total: money(line.return_qty * line.unit_price),
           }
           await db.sales_return_lines.add(returnLine)
           syncEngine.enqueueOperation('sales_return_lines', 'INSERT', returnLine)
 
+          // Return stock to balance
           const stock = await db.stock_balances.where({ store_id: storeId, item_id: line.item_id, branch_id: branchId }).first()
           if (stock) {
             await db.stock_balances.where({ store_id: storeId, item_id: line.item_id, branch_id: branchId }).modify({
@@ -157,6 +163,7 @@ export default function SalesReturnsPage() {
             })
           }
 
+          // Stock ledger entry
           const ledger = {
             id: crypto.randomUUID(),
             store_id: storeId,
@@ -166,36 +173,38 @@ export default function SalesReturnsPage() {
             direction: 'in' as const,
             quantity: line.return_qty,
             unit_price: line.unit_price,
-            total: line.return_qty * line.unit_price,
+            total: money(line.return_qty * line.unit_price),
             source_table: 'sales_returns',
             source_id: returnId,
+            notes: `مرتجع مبيعات رقم ${returnNumber} للفاتورة ${currentInvoice.sale.invoice_number}`,
             created_at: now,
           }
           await db.stock_ledger.add(ledger)
           syncEngine.enqueueOperation('stock_ledger', 'INSERT', ledger)
         }
 
+        // Refund cash transaction
         const cashTx: CashTransaction = {
           id: crypto.randomUUID(),
           store_id: storeId,
           branch_id: branchId,
-          transaction_type: 'sales-return-refund',
+          type: 'sale_return',
           direction: 'out',
           amount: totalRefund,
           payment_method: 'cash',
-          account_name: 'الصندوق الرئيسي',
           source_table: 'sales_returns',
           source_id: returnId,
-          notes: `مرتجع مبيعات ${returnNumber} لفاتورة ${currentInvoice.sale.invoice_number}`,
+          notes: `استرداد نقدي لمرتجع مبيعات ${returnNumber} للفاتورة ${currentInvoice.sale.invoice_number}`,
           created_at: now,
         }
         await db.cash_transactions.add(cashTx)
         syncEngine.enqueueOperation('cash_transactions', 'INSERT', cashTx)
       })
 
-      toast.success(`تم تسجيل المرتجع بنجاح برقم ${returnNumber} واسترداد ${totalRefund.toFixed(2)} ج.م`)
+      toast.success(`تم تسجيل المرتجع بنجاح برقم ${returnNumber} واسترداد ${totalRefund.toFixed(2)} ج.م للعميل`)
       setInvoiceNumber('')
       setInvoiceSearchTerm('')
+      setInvoiceReturnQuantities({})
 
     } catch (error: any) {
       console.error(error)
@@ -216,10 +225,10 @@ export default function SalesReturnsPage() {
       const now = new Date().toISOString()
       const returnNumber = generateReturnNumber('sale')
       const returnId = crypto.randomUUID()
-      const storeId = 'default'
-      const branchId = 'default'
+      const storeId = DEFAULT_STORE_UUID
+      const branchId = DEFAULT_BRANCH_UUID
 
-      const totalRefund = freeReturnItems.reduce((sum, item) => sum + (item.return_qty * item.unit_price), 0)
+      const totalRefund = money(freeReturnItems.reduce((sum, item) => sum + (item.return_qty * item.unit_price), 0))
 
       const salesReturn: SalesReturn = {
         id: returnId,
@@ -248,7 +257,7 @@ export default function SalesReturnsPage() {
             item_id: item.item_id,
             quantity: item.return_qty,
             unit_price: item.unit_price,
-            total: item.return_qty * item.unit_price,
+            total: money(item.return_qty * item.unit_price),
           }
           await db.sales_return_lines.add(returnLine)
           syncEngine.enqueueOperation('sales_return_lines', 'INSERT', returnLine)
@@ -270,9 +279,10 @@ export default function SalesReturnsPage() {
             direction: 'in' as const,
             quantity: item.return_qty,
             unit_price: item.unit_price,
-            total: item.return_qty * item.unit_price,
+            total: money(item.return_qty * item.unit_price),
             source_table: 'sales_returns',
             source_id: returnId,
+            notes: `مرتجع مبيعات حر رقم ${returnNumber}`,
             created_at: now,
           }
           await db.stock_ledger.add(ledger)
@@ -283,14 +293,13 @@ export default function SalesReturnsPage() {
           id: crypto.randomUUID(),
           store_id: storeId,
           branch_id: branchId,
-          transaction_type: 'sales-return-refund',
+          type: 'sale_return',
           direction: 'out',
           amount: totalRefund,
           payment_method: 'cash',
-          account_name: 'الصندوق الرئيسي',
           source_table: 'sales_returns',
           source_id: returnId,
-          notes: `مرتجع مبيعات حر ${returnNumber}`,
+          notes: `استرداد نقدي لمرتجع مبيعات حر ${returnNumber}`,
           created_at: now,
         }
         await db.cash_transactions.add(cashTx)
@@ -309,7 +318,7 @@ export default function SalesReturnsPage() {
   }
 
   return (
-    <div className="space-y-6 pb-20" dir="rtl">
+    <div className="space-y-6 pb-24 select-none" dir="rtl">
       {/* Header Banner */}
       <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-sm transition-colors">
         <div className="flex items-center gap-4">
@@ -327,7 +336,7 @@ export default function SalesReturnsPage() {
         </div>
       </div>
 
-      {/* Tabs with Prominent 3D Buttons */}
+      {/* Tabs with Prominent Buttons */}
       <Tabs defaultValue="invoice" className="w-full">
         <TabsList className="w-full max-w-lg grid grid-cols-2">
           <TabsTrigger value="invoice">
@@ -351,14 +360,14 @@ export default function SalesReturnsPage() {
             <CardContent className="space-y-6">
               <div className="flex flex-col sm:flex-row gap-3 max-w-lg">
                 <Input 
-                  placeholder="رقم الفاتورة (مثال: INV-1001)" 
+                  placeholder="رقم الفاتورة (مثال: ERP-INV-...)" 
                   value={invoiceNumber}
                   onChange={(e) => setInvoiceNumber(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSearchInvoice()}
                   className="h-12 text-base font-mono bg-slate-50/80 dark:bg-slate-800/80 rounded-xl"
                   dir="ltr"
                 />
-                <Button onClick={handleSearchInvoice} size="lg" className="h-12 px-8 text-sm font-black bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-xl shadow-md shadow-blue-600/25">
+                <Button onClick={handleSearchInvoice} size="lg" className="h-12 px-8 text-sm font-black bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-xl shadow-md shadow-blue-600/25 cursor-pointer">
                   <Search className="w-4 h-4 ml-2" />
                   بحث
                 </Button>
@@ -387,30 +396,49 @@ export default function SalesReturnsPage() {
                         <tr>
                           <th className="py-3.5 px-5">اسم المنتج</th>
                           <th className="py-3.5 px-5 text-center">الكمية المباعة</th>
-                          <th className="py-3.5 px-5">سعر الوحدة</th>
-                          <th className="py-3.5 px-5">الإجمالي</th>
-                          <th className="py-3.5 px-5 w-40 text-center">الكمية المرتجعة</th>
+                          <th className="py-3.5 px-5 text-center">سعر الوحدة</th>
+                          <th className="py-3.5 px-5 text-center">الإجمالي</th>
+                          <th className="py-3.5 px-5 w-48 text-center">الكمية المرتجعة</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                        {currentInvoice.lines.map(line => (
-                          <tr key={line.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50">
-                            <td className="py-3.5 px-5 font-bold text-slate-900 dark:text-slate-100">{line.item_name}</td>
-                            <td className="py-3.5 px-5 text-center font-bold">{line.quantity}</td>
-                            <td className="py-3.5 px-5 font-mono">{line.unit_price.toFixed(2)} ج.م</td>
-                            <td className="py-3.5 px-5 font-mono font-bold">{(line.quantity * line.unit_price).toFixed(2)} ج.م</td>
-                            <td className="py-3.5 px-5">
-                              <Input 
-                                type="number" 
-                                min="0" 
-                                max={line.quantity}
-                                value={line.return_qty || 0}
-                                onChange={(e) => handleInvoiceQtyChange(line.id, parseInt(e.target.value) || 0, line.quantity)}
-                                className="h-10 text-center font-bold text-base bg-slate-50 dark:bg-slate-800 rounded-xl"
-                              />
-                            </td>
-                          </tr>
-                        ))}
+                        {currentInvoice.lines.map(line => {
+                          const currentVal = invoiceReturnQuantities[line.id] !== undefined ? invoiceReturnQuantities[line.id] : 0
+                          return (
+                            <tr key={line.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50">
+                              <td className="py-3.5 px-5 font-bold text-slate-900 dark:text-slate-100">{line.item_name}</td>
+                              <td className="py-3.5 px-5 text-center font-bold font-mono">{line.quantity}</td>
+                              <td className="py-3.5 px-5 text-center font-mono">{line.unit_price.toFixed(2)} ج.م</td>
+                              <td className="py-3.5 px-5 text-center font-mono font-bold">{(line.quantity * line.unit_price).toFixed(2)} ج.م</td>
+                              <td className="py-3.5 px-5">
+                                <div className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl mx-auto w-full justify-center">
+                                  <button 
+                                    type="button"
+                                    onClick={() => handleInvoiceQtyChange(line.id, currentVal - 1, line.quantity)}
+                                    className="w-8 h-8 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 active:scale-95 transition-all cursor-pointer"
+                                  >
+                                    <Minus className="w-3.5 h-3.5" />
+                                  </button>
+                                  <input 
+                                    type="number" 
+                                    min="0" 
+                                    max={line.quantity}
+                                    value={currentVal}
+                                    onChange={(e) => handleInvoiceQtyChange(line.id, parseInt(e.target.value) || 0, line.quantity)}
+                                    className="w-16 h-8 text-center font-black font-mono text-base bg-transparent text-slate-900 dark:text-white outline-none"
+                                  />
+                                  <button 
+                                    type="button"
+                                    onClick={() => handleInvoiceQtyChange(line.id, currentVal + 1, line.quantity)}
+                                    className="w-8 h-8 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 active:scale-95 transition-all cursor-pointer"
+                                  >
+                                    <Plus className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -420,7 +448,7 @@ export default function SalesReturnsPage() {
                       size="lg" 
                       onClick={submitInvoiceReturn} 
                       disabled={isSubmitting}
-                      className="h-12 px-8 text-sm font-black bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded-xl shadow-md shadow-rose-600/25 active:scale-95"
+                      className="h-14 px-8 text-base font-black bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded-xl shadow-md shadow-rose-600/25 active:scale-95 cursor-pointer"
                     >
                       <CheckCircle2 className="w-5 h-5 ml-2" />
                       {isSubmitting ? 'جاري المعالجة...' : 'تأكيد مرتجع الفاتورة واسترداد المبلغ'}
@@ -441,7 +469,9 @@ export default function SalesReturnsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="relative max-w-md">
+              
+              {/* Isolated Search dropdown */}
+              <div className="relative max-w-md z-30">
                 <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 w-5 h-5 pointer-events-none" />
                 <Input 
                   placeholder="ابحث بالاسم أو الباركود لإضافة صنف للمرتجع..." 
@@ -451,7 +481,7 @@ export default function SalesReturnsPage() {
                 />
 
                 {searchResults.length > 0 && (
-                  <div className="absolute top-14 right-0 left-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl z-20 overflow-hidden divide-y dark:divide-slate-800">
+                  <div className="absolute top-full right-0 left-0 mt-2 z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl overflow-hidden divide-y dark:divide-slate-800">
                     {searchResults.map(item => (
                       <div 
                         key={item.id} 
@@ -477,7 +507,7 @@ export default function SalesReturnsPage() {
                         <tr>
                           <th className="py-3.5 px-5">اسم المنتج</th>
                           <th className="py-3.5 px-5">سعر الإرجاع</th>
-                          <th className="py-3.5 px-5 w-40 text-center">الكمية</th>
+                          <th className="py-3.5 px-5 w-48 text-center">الكمية</th>
                           <th className="py-3.5 px-5">الإجمالي</th>
                           <th className="py-3.5 px-5 w-16"></th>
                         </tr>
@@ -488,13 +518,29 @@ export default function SalesReturnsPage() {
                             <td className="py-3.5 px-5 font-bold text-slate-900 dark:text-slate-100">{item.name}</td>
                             <td className="py-3.5 px-5 font-mono">{item.unit_price.toFixed(2)} ج.م</td>
                             <td className="py-3.5 px-5">
-                              <Input 
-                                type="number" 
-                                min="1" 
-                                value={item.return_qty}
-                                onChange={(e) => handleFreeQtyChange(item.item_id, parseInt(e.target.value) || 1)}
-                                className="h-10 text-center font-bold text-base bg-slate-50 dark:bg-slate-800 rounded-xl"
-                              />
+                              <div className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl mx-auto w-full justify-center">
+                                <button 
+                                  type="button"
+                                  onClick={() => handleFreeQtyChange(item.item_id, item.return_qty - 1)}
+                                  className="w-8 h-8 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 active:scale-95 transition-all cursor-pointer"
+                                >
+                                  <Minus className="w-3.5 h-3.5" />
+                                </button>
+                                <input 
+                                  type="number" 
+                                  min="1" 
+                                  value={item.return_qty}
+                                  onChange={(e) => handleFreeQtyChange(item.item_id, parseInt(e.target.value) || 1)}
+                                  className="w-16 h-8 text-center font-black font-mono text-base bg-transparent text-slate-900 dark:text-white outline-none"
+                                />
+                                <button 
+                                  type="button"
+                                  onClick={() => handleFreeQtyChange(item.item_id, item.return_qty + 1)}
+                                  className="w-8 h-8 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 active:scale-95 transition-all cursor-pointer"
+                                >
+                                  <Plus className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </td>
                             <td className="py-3.5 px-5 font-mono font-black text-blue-600 dark:text-blue-400">
                               {(item.return_qty * item.unit_price).toFixed(2)} ج.م
@@ -515,7 +561,7 @@ export default function SalesReturnsPage() {
                       size="lg" 
                       onClick={submitFreeReturn} 
                       disabled={isSubmitting}
-                      className="h-12 px-8 text-sm font-black bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded-xl shadow-md shadow-rose-600/25 active:scale-95"
+                      className="h-14 px-8 text-base font-black bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded-xl shadow-md shadow-rose-600/25 active:scale-95 cursor-pointer"
                     >
                       <CheckCircle2 className="w-5 h-5 ml-2" />
                       {isSubmitting ? 'جاري المعالجة...' : 'تأكيد المرتجع الحر واسترداد المبلغ'}
