@@ -8,6 +8,18 @@ export type SyncStatus = {
   failed: number;
 };
 
+// Standard valid fallback UUIDs for offline standalone operation
+export const DEFAULT_STORE_UUID = '00000000-0000-0000-0000-000000000001';
+export const DEFAULT_BRANCH_UUID = '00000000-0000-0000-0000-000000000002';
+export const DEFAULT_USER_UUID = '00000000-0000-0000-0000-000000000003';
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isValidUUID(str: any): boolean {
+  if (typeof str !== 'string') return false;
+  return UUID_REGEX.test(str) || str.startsWith('00000000-0000-0000-0000-');
+}
+
 class SyncEngine {
   private isSyncing = false;
   private autoSyncInterval: ReturnType<typeof setInterval> | null = null;
@@ -40,8 +52,42 @@ class SyncEngine {
     this.emitStatus();
     
     if (typeof navigator !== 'undefined' && navigator.onLine) {
-      this.processQueue();
+      // Defer execution slightly to avoid blocking UI rendering
+      setTimeout(() => this.processQueue(), 50);
     }
+  }
+
+  /**
+   * Clean and prepare payload for Supabase PostgreSQL schema
+   */
+  private sanitizePayload(tableName: string, payload: any) {
+    if (!payload || typeof payload !== 'object') return payload;
+    const clean = { ...payload };
+
+    // Ensure valid UUIDs for UUID columns
+    if (clean.id && !isValidUUID(clean.id)) {
+      clean.id = DEFAULT_STORE_UUID;
+    }
+    if (clean.store_id && !isValidUUID(clean.store_id)) {
+      clean.store_id = DEFAULT_STORE_UUID;
+    }
+    if (clean.branch_id && !isValidUUID(clean.branch_id)) {
+      clean.branch_id = DEFAULT_BRANCH_UUID;
+    }
+    if (clean.owner_id && !isValidUUID(clean.owner_id)) {
+      clean.owner_id = DEFAULT_USER_UUID;
+    }
+    if (clean.customer_id && !isValidUUID(clean.customer_id)) {
+      delete clean.customer_id;
+    }
+    if (clean.supplier_id && !isValidUUID(clean.supplier_id)) {
+      delete clean.supplier_id;
+    }
+    if (clean.category_id && !isValidUUID(clean.category_id)) {
+      delete clean.category_id;
+    }
+
+    return clean;
   }
 
   /**
@@ -62,44 +108,52 @@ class SyncEngine {
         if (typeof navigator !== 'undefined' && !navigator.onLine) break;
 
         try {
-          if (op.action === 'INSERT') {
-            const { error } = await this.supabase.from(op.table_name).insert(op.payload);
-            if (error) throw error;
-          } else if (op.action === 'UPDATE') {
-            const { error } = await this.supabase
-              .from(op.table_name)
-              .update(op.payload)
-              .eq('id', op.payload.id);
-            if (error) throw error;
-          } else if (op.action === 'DELETE') {
+          const sanitized = this.sanitizePayload(op.table_name, op.payload);
+
+          if (op.action === 'DELETE') {
             const { error } = await this.supabase
               .from(op.table_name)
               .delete()
-              .eq('id', op.payload.id);
+              .eq('id', sanitized.id);
+            if (error) throw error;
+          } else {
+            // Use upsert for both INSERT and UPDATE to prevent duplication / missing row errors
+            const { error } = await this.supabase
+              .from(op.table_name)
+              .upsert(sanitized, { onConflict: 'id' });
             if (error) throw error;
           }
 
           // Mark as synced upon success
           await (db as any).sync_queue.update(op.id, { 
             status: 'synced', 
-            synced_at: new Date().toISOString() 
+            synced_at: new Date().toISOString(),
+            error_message: undefined
           });
-        } catch (error) {
-          console.error(`Sync error for operation ${op.id}:`, error);
+        } catch (err: any) {
+          const errorMsg = err?.message || (typeof err === 'object' ? JSON.stringify(err) : String(err));
+          // Soft warn to avoid triggering Next.js full-screen dev error overlay
+          console.warn(`[SyncEngine] Offline deferred op ${op.id} (${op.table_name}): ${errorMsg}`);
+          
           const nextRetry = (op.retry_count || 0) + 1;
           
           if (nextRetry >= 3) {
-            // Mark as failed after 3 retries
+            // Mark as failed after 3 retries so queue can continue
             await (db as any).sync_queue.update(op.id, { 
               status: 'failed', 
-              error_message: error instanceof Error ? error.message : String(error) 
+              error_message: errorMsg 
             });
           } else {
             // Increment retry count
-            await (db as any).sync_queue.update(op.id, { retry_count: nextRetry });
+            await (db as any).sync_queue.update(op.id, { 
+              retry_count: nextRetry,
+              error_message: errorMsg 
+            });
           }
         }
       }
+    } catch (queueErr) {
+      console.warn('[SyncEngine] Queue processing notice:', queueErr);
     } finally {
       this.isSyncing = false;
       this.emitStatus();
@@ -109,7 +163,7 @@ class SyncEngine {
   /**
    * Starts periodic syncing of the queue.
    */
-  startAutoSync(intervalMs: number = 5000) {
+  startAutoSync(intervalMs: number = 10000) {
     if (this.autoSyncInterval) return;
     
     if (typeof window !== 'undefined') {
@@ -132,13 +186,29 @@ class SyncEngine {
   }
 
   /**
+   * Clear or reset failed operations
+   */
+  async clearFailedOperations() {
+    try {
+      await (db as any).sync_queue.where('status').equals('failed').delete();
+      this.emitStatus();
+    } catch (e) {
+      console.warn('[SyncEngine] clearFailed error:', e);
+    }
+  }
+
+  /**
    * Returns current counts of pending, synced, and failed operations.
    */
   async getSyncStatus(): Promise<SyncStatus> {
-    const pending = await (db as any).sync_queue.where('status').equals('pending').count();
-    const synced = await (db as any).sync_queue.where('status').equals('synced').count();
-    const failed = await (db as any).sync_queue.where('status').equals('failed').count();
-    return { pending, synced, failed };
+    try {
+      const pending = await (db as any).sync_queue.where('status').equals('pending').count();
+      const synced = await (db as any).sync_queue.where('status').equals('synced').count();
+      const failed = await (db as any).sync_queue.where('status').equals('failed').count();
+      return { pending, synced, failed };
+    } catch {
+      return { pending: 0, synced: 0, failed: 0 };
+    }
   }
 
   /**

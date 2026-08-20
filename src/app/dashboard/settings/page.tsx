@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { db } from '@/lib/db'
-import { syncEngine } from '@/lib/sync-engine'
+import { syncEngine, DEFAULT_STORE_UUID, DEFAULT_USER_UUID } from '@/lib/sync-engine'
 import { useStore } from '@/lib/store-context'
 import { BusinessType } from '@/lib/types'
 import { toast } from 'sonner'
-import { Save, Store, Printer, RefreshCw, Database, ShieldCheck, Key, Layers, CheckCircle2 } from 'lucide-react'
+import { Save, Store, Printer, RefreshCw, Database, ShieldCheck, Key, Layers, CheckCircle2, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -42,6 +42,13 @@ export default function SettingsPage() {
       setSyncStatus(status)
     }
     loadSettings()
+
+    const unsubscribe = syncEngine.subscribe((status) => {
+      setSyncStatus(status)
+    })
+    return () => {
+      unsubscribe()
+    }
   }, [storeName])
 
   const handleSaveAllSettings = async () => {
@@ -51,8 +58,8 @@ export default function SettingsPage() {
       const now = new Date().toISOString()
 
       const storeData = {
-        id: existing?.id || 'default-store-001',
-        owner_id: existing?.owner_id || 'admin-cashier-001',
+        id: existing?.id || DEFAULT_STORE_UUID,
+        owner_id: existing?.owner_id || DEFAULT_USER_UUID,
         name: localStoreName.trim(),
         business_type: localBusinessType,
         status: 'active' as const,
@@ -94,8 +101,15 @@ export default function SettingsPage() {
     toast.success('تم الانتهاء من المزامنة بنجاح')
   }
 
+  const handleClearFailed = async () => {
+    await syncEngine.clearFailedOperations()
+    const status = await syncEngine.getSyncStatus()
+    setSyncStatus(status)
+    toast.success('تم تنظيف طابور العمليات العالقة بنجاح')
+  }
+
   return (
-    <div className="space-y-6 pb-24" dir="rtl">
+    <div className="space-y-6 pb-24 select-none" dir="rtl">
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-sm transition-colors">
         <div>
@@ -310,15 +324,29 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <Button 
-              onClick={handleManualSync} 
-              variant="outline" 
-              size="lg" 
-              className="gap-2 font-bold h-12 rounded-xl text-sm border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-            >
-              <RefreshCw className="h-4 w-4 ml-1 text-blue-600 dark:text-blue-400" />
-              فحص ومزامنة فورية الآن
-            </Button>
+            <div className="flex flex-wrap gap-3">
+              <Button 
+                onClick={handleManualSync} 
+                variant="outline" 
+                size="lg" 
+                className="gap-2 font-bold h-12 rounded-xl text-sm border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+              >
+                <RefreshCw className="h-4 w-4 ml-1 text-blue-600 dark:text-blue-400" />
+                فحص ومزامنة فورية الآن
+              </Button>
+
+              {syncStatus.failed > 0 && (
+                <Button 
+                  onClick={handleClearFailed} 
+                  variant="outline" 
+                  size="lg" 
+                  className="gap-2 font-bold h-12 rounded-xl text-sm border-rose-300 dark:border-rose-800 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
+                >
+                  <Trash2 className="h-4 w-4 ml-1" />
+                  مسح العمليات العالقة ({syncStatus.failed})
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
 
