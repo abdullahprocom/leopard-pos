@@ -386,6 +386,16 @@ CREATE TABLE IF NOT EXISTS public.stock_transfer_lines (
 -- 6. RBAC TABLES (الصلاحيات)
 -- ============================================================
 
+CREATE TABLE IF NOT EXISTS public.roles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  store_id UUID NOT NULL REFERENCES public.stores(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  is_system BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(store_id, name)
+);
+
 CREATE TABLE IF NOT EXISTS public.employees (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   store_id UUID NOT NULL REFERENCES public.stores(id) ON DELETE CASCADE,
@@ -398,16 +408,6 @@ CREATE TABLE IF NOT EXISTS public.employees (
   status TEXT NOT NULL DEFAULT 'active',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS public.roles (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  store_id UUID NOT NULL REFERENCES public.stores(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  description TEXT,
-  is_system BOOLEAN NOT NULL DEFAULT false,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE(store_id, name)
 );
 
 -- صلاحيات 3 مستويات: صفحة + عملية + عنصر UI
