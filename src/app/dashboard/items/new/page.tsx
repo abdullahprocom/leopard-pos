@@ -5,18 +5,21 @@ import { useRouter } from 'next/navigation'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/lib/db'
 import { syncEngine } from '@/lib/sync-engine'
+import { useStore } from '@/lib/store-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { ArrowRight, Plus, Trash2, Save, AlertCircle } from 'lucide-react'
+import { ArrowRight, Plus, Trash2, Save, Sparkles, Scale, Pill } from 'lucide-react'
 import { toast } from 'sonner'
 import type { ItemType, ItemStatus } from '@/lib/types'
+import { cleanPositiveQuantity, cleanPositivePrice, money } from '@/lib/finance'
 
 export default function NewItemPage() {
   const router = useRouter()
+  const { isPharma, businessType } = useStore()
   
   // Basic info
   const [name, setName] = useState('')
@@ -26,6 +29,12 @@ export default function NewItemPage() {
   const [manufacturer, setManufacturer] = useState('')
   const [itemType, setItemType] = useState<ItemType>('stocked')
   const [status, setStatus] = useState<ItemStatus>('active')
+  const [allowDecimal, setAllowDecimal] = useState(false) // ميزان / أوزان وكسور منضبطة
+  
+  // Pharmacy-specific info (conditional)
+  const [scientificName, setScientificName] = useState('')
+  const [activeIngredient, setActiveIngredient] = useState('')
+  const [prescriptionRequired, setPrescriptionRequired] = useState(false)
   
   // Pricing
   const [buyPrice, setBuyPrice] = useState('0')
@@ -93,8 +102,12 @@ export default function NewItemPage() {
         return
       }
 
-      if (parseFloat(sellPrice) <= 0) {
-        toast.error('سعر البيع يجب أن يكون أكبر من صفر')
+      const cleanSell = cleanPositivePrice(sellPrice)
+      const cleanBuy = cleanPositivePrice(buyPrice)
+      const cleanMinSell = cleanPositivePrice(minSellPrice)
+
+      if (cleanSell <= 0) {
+        toast.error('سعر البيع يجب أن يكون أكبر من صفر (ممنوع الأرقام السالبة)')
         return
       }
 
@@ -130,11 +143,12 @@ export default function NewItemPage() {
       })
       
       const unitNamesList = units.map(u => u.unit_name.trim())
-      const searchText = `${name} ${nameEn} ${manufacturer} ${allBarcodesList.join(' ')} ${unitNamesList.join(' ')}`.toLowerCase()
+      const pharmaKeywords = isPharma ? `${scientificName} ${activeIngredient}` : ''
+      const searchText = `${name} ${nameEn} ${manufacturer} ${pharmaKeywords} ${allBarcodesList.join(' ')} ${unitNamesList.join(' ')}`.toLowerCase()
 
       const newItem = {
         id: itemId,
-        store_id: 'default', // In a real app, get from auth context
+        store_id: 'default-store-001',
         name: name.trim(),
         name_en: nameEn.trim(),
         sku: sku.trim(),
@@ -142,14 +156,21 @@ export default function NewItemPage() {
         manufacturer: manufacturer.trim(),
         unit: units[0].unit_name.trim() || 'قطعة',
         item_type: itemType,
-        buy_price: parseFloat(buyPrice) || 0,
-        sell_price: parseFloat(sellPrice) || 0,
-        min_sell_price: parseFloat(minSellPrice) || 0,
+        buy_price: cleanBuy,
+        sell_price: cleanSell,
+        min_sell_price: cleanMinSell,
         manage_inventory: manageInventory,
         not_for_sale: false,
-        low_stock_alert: parseFloat(lowStockAlert) || 0,
+        low_stock_alert: cleanPositiveQuantity(lowStockAlert, allowDecimal),
+        allow_decimal: allowDecimal,
         search_text: searchText,
         status: status,
+        // Conditionally store pharma data
+        ...(isPharma ? {
+          scientific_name: scientificName.trim(),
+          active_ingredient: activeIngredient.trim(),
+          prescription_required: prescriptionRequired
+        } : {}),
         created_at: now,
         updated_at: now
       }
@@ -164,7 +185,7 @@ export default function NewItemPage() {
         for (const b of validBarcodes) {
           const itemBarcode = {
             id: crypto.randomUUID(),
-            store_id: 'default',
+            store_id: 'default-store-001',
             item_id: itemId,
             barcode: b.barcode.trim(),
             is_primary: b.is_primary,
@@ -180,14 +201,14 @@ export default function NewItemPage() {
           const u = units[i]
           const itemUnit = {
             id: crypto.randomUUID(),
-            store_id: 'default',
+            store_id: 'default-store-001',
             item_id: itemId,
             level: u.level,
             unit_name: u.unit_name.trim(),
-            qty_in_parent: u.qty_in_parent || 1,
+            qty_in_parent: Math.max(1, Math.floor(Math.abs(Number(u.qty_in_parent) || 1))), // Safe whole integer
             parent_unit: parentUnitName,
             barcode: u.barcode?.trim() || undefined,
-            sell_price: u.sell_price ? parseFloat(u.sell_price) : undefined,
+            sell_price: u.sell_price ? cleanPositivePrice(u.sell_price) : undefined,
             buy_price: undefined
           }
           await db.item_units.add(itemUnit)
@@ -196,29 +217,31 @@ export default function NewItemPage() {
         }
 
         // 4. Handle Opening Stock
-        const openStockVal = parseFloat(openingStock) || 0
+        const openStockVal = Math.max(0, Number(openingStock) || 0)
+        const cleanOpening = allowDecimal ? cleanPositiveQuantity(openStockVal, true) : Math.floor(openStockVal)
+
         const stockBalance = {
           id: crypto.randomUUID(),
-          store_id: 'default',
-          branch_id: 'default', // Ideally get from context
+          store_id: 'default-store-001',
+          branch_id: 'default-branch-001',
           item_id: itemId,
-          quantity: openStockVal,
+          quantity: cleanOpening,
           updated_at: now
         }
         await db.stock_balances.add(stockBalance)
         syncEngine.enqueueOperation('stock_balances', 'INSERT', stockBalance)
 
-        if (openStockVal > 0) {
+        if (cleanOpening > 0) {
           const ledgerEntry = {
             id: crypto.randomUUID(),
-            store_id: 'default',
-            branch_id: 'default',
+            store_id: 'default-store-001',
+            branch_id: 'default-branch-001',
             item_id: itemId,
             movement_type: 'opening' as const,
             direction: 'in' as const,
-            quantity: openStockVal,
-            unit_price: parseFloat(buyPrice) || 0,
-            total: (parseFloat(buyPrice) || 0) * openStockVal,
+            quantity: cleanOpening,
+            unit_price: cleanBuy,
+            total: money(cleanBuy * cleanOpening),
             created_at: now
           }
           await db.stock_ledger.add(ledgerEntry)
@@ -226,7 +249,7 @@ export default function NewItemPage() {
         }
       })
 
-      toast.success('تم إضافة المنتج بنجاح')
+      toast.success('تم إضافة المنتج بنجاح وتأمينه ضد السوالب والكسور العشوائية')
       router.push('/dashboard/items')
       router.refresh()
 
@@ -239,12 +262,15 @@ export default function NewItemPage() {
   }
 
   return (
-    <div className="space-y-6 pb-20" dir="rtl">
+    <div className="space-y-6 pb-28" dir="rtl">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => router.push('/dashboard/items')} className="h-10 w-10 shrink-0">
           <ArrowRight className="h-6 w-6" />
         </Button>
-        <h1 className="text-3xl font-bold">إضافة منتج جديد</h1>
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">إضافة منتج جديد</h1>
+          <p className="text-xs text-slate-400 font-medium">نشاط: {businessType === 'pharmacy' ? 'صيدلية' : 'سوبر ماركت وتجارة عامة'}</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -259,7 +285,7 @@ export default function NewItemPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">اسم المنتج (عربي) *</Label>
-                  <Input id="name" value={name} onChange={e => setName(e.target.value)} className="h-12" />
+                  <Input id="name" value={name} onChange={e => setName(e.target.value)} className="h-12" placeholder="مثال: جبنة دومتي بلس 500 جرام" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="nameEn">اسم المنتج (إنجليزي)</Label>
@@ -284,23 +310,65 @@ export default function NewItemPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="manufacturer">الشركة المصنعة</Label>
+                  <Label htmlFor="manufacturer">الشركة المصنعة / المورد</Label>
                   <Input id="manufacturer" value={manufacturer} onChange={e => setManufacturer(e.target.value)} className="h-12" />
+                </div>
+
+                {/* Decimal Scale Toggle */}
+                <div className="flex items-center justify-between p-3.5 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-800/40">
+                  <div className="space-y-0.5">
+                    <Label className="text-xs font-black flex items-center gap-1.5 text-slate-900 dark:text-white">
+                      <Scale className="w-4 h-4 text-blue-500" />
+                      صنف ميزان / يقبل الكسور (كجم)
+                    </Label>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">إذا تم تفعيله، يسمح بالكسور حتى 3 أرقام عشرية</p>
+                  </div>
+                  <Switch checked={allowDecimal} onCheckedChange={setAllowDecimal} />
                 </div>
               </div>
             </CardContent>
           </Card>
 
+          {/* Conditional Pharmacy Information */}
+          {isPharma && (
+            <Card className="border-amber-500/30 bg-amber-500/5">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-amber-500">
+                  <Pill className="h-5 w-5" />
+                  بيانات الصيدلية والأدوية
+                </CardTitle>
+                <CardDescription>البيانات الطبية المخصصة للأدوية والمستلزمات الصيدلية</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>الاسم العلمي (Scientific Name)</Label>
+                    <Input value={scientificName} onChange={e => setScientificName(e.target.value)} className="h-12 text-left" dir="ltr" placeholder="Paracetamol" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>المادة الفعالة (Active Ingredient)</Label>
+                    <Input value={activeIngredient} onChange={e => setActiveIngredient(e.target.value)} className="h-12" placeholder="باراسيتامول 500 مجم" />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between p-3.5 border border-amber-500/20 rounded-xl bg-amber-500/10">
+                  <Label className="text-xs font-bold text-amber-900 dark:text-amber-200">صرف بروشتة فقط (Prescription Only)</Label>
+                  <Switch checked={prescriptionRequired} onCheckedChange={setPrescriptionRequired} />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Packing levels & Units (Supermarket/General) */}
           <Card>
             <CardHeader>
               <CardTitle>مستويات التعبئة والوحدات</CardTitle>
-              <CardDescription>أضف وحدات القياس للمنتج (مثل: كرتونة تحتوي على 12 علبة، والعلبة تحتوي على 10 شرائط)</CardDescription>
+              <CardDescription>أضف وحدات القياس للمنتج (مثل: كرتونة تحتوي على 12 علبة، والعلبة تحتوي على 10 قطع)</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {units.map((unit, index) => (
-                <div key={index} className="flex flex-col sm:flex-row gap-4 p-4 border rounded-lg bg-muted/20 relative">
+                <div key={index} className="flex flex-col sm:flex-row gap-4 p-4 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-800/30 relative">
                   {index > 0 && (
-                    <Button variant="ghost" size="icon" className="absolute top-2 left-2 text-destructive" onClick={() => removeUnit(index)}>
+                    <Button variant="ghost" size="icon" className="absolute top-2 left-2 text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40" onClick={() => removeUnit(index)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   )}
@@ -312,9 +380,9 @@ export default function NewItemPage() {
                   </div>
                   {index > 0 && (
                     <div className="flex-1 space-y-2">
-                      <Label>يحتوي على كم {units[index - 1].unit_name || 'وحدة أصغر'}؟</Label>
-                      <Input type="number" value={unit.qty_in_parent} onChange={e => {
-                        const newUnits = [...units]; newUnits[index].qty_in_parent = Number(e.target.value); setUnits(newUnits)
+                      <Label>يحتوي على كم {units[index - 1].unit_name || 'وحدة أصغر'}؟ (عدد صحيح)</Label>
+                      <Input type="number" min="1" step="1" value={unit.qty_in_parent} onChange={e => {
+                        const newUnits = [...units]; newUnits[index].qty_in_parent = Math.max(1, Math.floor(Math.abs(Number(e.target.value) || 1))); setUnits(newUnits)
                       }} className="h-12" />
                     </div>
                   )}
@@ -333,15 +401,16 @@ export default function NewItemPage() {
             </CardContent>
           </Card>
 
+          {/* Inventory tracking */}
           <Card>
             <CardHeader>
-              <CardTitle>إدارة المخزون</CardTitle>
+              <CardTitle>إدارة المخزون وتفادي العجز</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div className="flex items-center justify-between p-4 border border-slate-200 dark:border-slate-800 rounded-xl">
                 <div className="space-y-0.5">
                   <Label className="text-base font-bold">تتبع المخزون</Label>
-                  <div className="text-sm text-muted-foreground">تفعيل خصم الكميات عند البيع والتنبيه بنقص المخزون</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">تفعيل خصم الكميات عند البيع والتنبيه بنقص المخزون</div>
                 </div>
                 <Switch checked={manageInventory} onCheckedChange={setManageInventory} />
               </div>
@@ -350,11 +419,25 @@ export default function NewItemPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>الرصيد الافتتاحي (بأصغر وحدة: {units[0]?.unit_name || 'قطعة'})</Label>
-                    <Input type="number" min="0" step="1" value={openingStock} onChange={e => setOpeningStock(e.target.value)} className="h-12" />
+                    <Input 
+                      type="number" 
+                      min="0" 
+                      step={allowDecimal ? "0.001" : "1"} 
+                      value={openingStock} 
+                      onChange={e => setOpeningStock(Math.max(0, parseFloat(e.target.value) || 0).toString())} 
+                      className="h-12" 
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>تنبيه نقص المخزون</Label>
-                    <Input type="number" min="0" step="1" value={lowStockAlert} onChange={e => setLowStockAlert(e.target.value)} className="h-12" />
+                    <Input 
+                      type="number" 
+                      min="0" 
+                      step="1" 
+                      value={lowStockAlert} 
+                      onChange={e => setLowStockAlert(Math.max(0, parseFloat(e.target.value) || 0).toString())} 
+                      className="h-12" 
+                    />
                   </div>
                 </div>
               )}
@@ -366,28 +449,52 @@ export default function NewItemPage() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>التسعير</CardTitle>
+              <CardTitle>التسعير المالي (ممنوع السوالب)</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="buyPrice">سعر الشراء (التكلفة)</Label>
                 <div className="relative">
-                  <Input id="buyPrice" type="number" step="0.01" min="0" value={buyPrice} onChange={e => setBuyPrice(e.target.value)} className="h-12 pl-12 text-lg" />
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">ج.م</span>
+                  <Input 
+                    id="buyPrice" 
+                    type="number" 
+                    step="0.01" 
+                    min="0" 
+                    value={buyPrice} 
+                    onChange={e => setBuyPrice(Math.max(0, parseFloat(e.target.value) || 0).toString())} 
+                    className="h-12 pl-12 text-lg font-mono font-bold" 
+                  />
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">ج.م</span>
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="sellPrice">سعر البيع الافتراضي *</Label>
                 <div className="relative">
-                  <Input id="sellPrice" type="number" step="0.01" min="0" value={sellPrice} onChange={e => setSellPrice(e.target.value)} className="h-12 pl-12 text-lg font-bold text-primary" />
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">ج.م</span>
+                  <Input 
+                    id="sellPrice" 
+                    type="number" 
+                    step="0.01" 
+                    min="0" 
+                    value={sellPrice} 
+                    onChange={e => setSellPrice(Math.max(0, parseFloat(e.target.value) || 0).toString())} 
+                    className="h-12 pl-12 text-lg font-black text-blue-600 dark:text-blue-400 font-mono" 
+                  />
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">ج.م</span>
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="minSellPrice">أقل سعر للبيع (اختياري)</Label>
                 <div className="relative">
-                  <Input id="minSellPrice" type="number" step="0.01" min="0" value={minSellPrice} onChange={e => setMinSellPrice(e.target.value)} className="h-12 pl-12" />
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">ج.م</span>
+                  <Input 
+                    id="minSellPrice" 
+                    type="number" 
+                    step="0.01" 
+                    min="0" 
+                    value={minSellPrice} 
+                    onChange={e => setMinSellPrice(Math.max(0, parseFloat(e.target.value) || 0).toString())} 
+                    className="h-12 pl-12 font-mono" 
+                  />
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">ج.م</span>
                 </div>
               </div>
             </CardContent>
@@ -410,7 +517,7 @@ export default function NewItemPage() {
                     dir="ltr"
                   />
                   {index > 0 && (
-                    <Button variant="ghost" size="icon" className="shrink-0 text-destructive" onClick={() => removeBarcode(index)}>
+                    <Button variant="ghost" size="icon" className="shrink-0 text-rose-500 hover:text-rose-600" onClick={() => removeBarcode(index)}>
                       <Trash2 className="h-5 w-5" />
                     </Button>
                   )}
@@ -426,8 +533,8 @@ export default function NewItemPage() {
       </div>
 
       {/* Fixed bottom action bar */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-2xl z-30 flex justify-end gap-4 px-6 sm:px-12">
-        <Button variant="outline" size="lg" className="h-14 px-8 text-base font-bold border-slate-300 text-slate-700 hover:bg-slate-100" onClick={() => router.push('/dashboard/items')} disabled={isSubmitting}>
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 shadow-2xl z-30 flex justify-end gap-4 px-6 sm:px-12">
+        <Button variant="outline" size="lg" className="h-14 px-8 text-base font-bold border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => router.push('/dashboard/items')} disabled={isSubmitting}>
           إلغاء
         </Button>
         <Button size="lg" className="h-14 px-12 text-base font-black bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/30 active:scale-95 transition-all" onClick={handleSave} disabled={isSubmitting}>

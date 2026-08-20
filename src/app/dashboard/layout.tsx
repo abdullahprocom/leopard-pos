@@ -20,11 +20,11 @@ import {
   Sparkles,
   Menu,
   X,
-  ChevronRight,
-  ChevronLeft,
+  ShieldCheck,
 } from 'lucide-react'
 import { OnlineStatus } from '@/components/OnlineStatus'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { useStore } from '@/lib/store-context'
 
 // Complete navigation links with modern Lucide icons
 const navLinks = [
@@ -47,11 +47,20 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false)
+  const { storeName, businessType, isActivated } = useStore()
 
   // Auto-close mobile drawer on route change
   useEffect(() => {
     setIsMobileOpen(false)
   }, [pathname])
+
+  const businessTypeLabels: Record<string, string> = {
+    supermarket: 'سوبر ماركت',
+    general: 'تجارة عامة',
+    pharmacy: 'صيدلية',
+    clothing: 'ملابس',
+    restaurant: 'مطاعم',
+  }
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 overflow-hidden font-sans antialiased" dir="rtl">
@@ -83,9 +92,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             {!isDesktopCollapsed && (
               <div className="transition-opacity duration-200">
                 <span className="text-xl font-black text-white tracking-tight">
-                  Leopard <span className="text-blue-500">POS</span>
+                  APR <span className="text-blue-500">System</span>
                 </span>
-                <p className="text-[11px] font-semibold text-slate-400">إدارة الكاشير والمخازن</p>
+                <p className="text-[11px] font-bold text-slate-400 truncate max-w-[150px]">
+                  {storeName} ({businessTypeLabels[businessType] || 'سوبر ماركت'})
+                </p>
               </div>
             )}
           </div>
@@ -134,7 +145,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                     <span className="truncate">{item.label}</span>
                     {item.highlight && !isActive && (
                       <span className="mr-auto text-[10px] bg-blue-500/20 text-blue-300 border border-blue-400/20 px-2 py-0.5 rounded-md font-bold">
-                        سريع
+                        F2
                       </span>
                     )}
                   </>
@@ -144,18 +155,21 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           })}
         </nav>
 
-        {/* Sidebar Footer & Collapse Toggle */}
+        {/* Sidebar Footer & Offline License Status */}
         <div className="p-3 border-t border-slate-800/60 bg-slate-950/40 shrink-0 flex items-center justify-between">
           {!isDesktopCollapsed ? (
             <div className="flex items-center justify-between w-full text-xs">
-              <span className="font-bold text-slate-300">نسخة v1.0</span>
+              <div className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                <ShieldCheck className="w-4 h-4" />
+                <span>{isActivated ? 'مرخص محلياً' : 'تجريبي'}</span>
+              </div>
               <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded-md font-mono">
-                Offline
+                APR v2.0
               </span>
             </div>
           ) : (
             <span className="mx-auto text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded font-mono">
-              v1.0
+              v2.0
             </span>
           )}
         </div>
@@ -183,12 +197,18 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               <Menu className="w-5 h-5" />
             </button>
 
-            <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight">
-              {navLinks.find(item => item.href === '/dashboard' ? pathname === '/dashboard' : (pathname === item.href || pathname.startsWith(item.href + '/')))?.label || 'لوحة القيادة'}
-            </h2>
+            <div>
+              <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight">
+                {navLinks.find(item => item.href === '/dashboard' ? pathname === '/dashboard' : (pathname === item.href || pathname.startsWith(item.href + '/')))?.label || 'لوحة القيادة'}
+              </h2>
+            </div>
           </div>
           
           <div className="flex items-center gap-3 sm:gap-4">
+            <div className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-xs font-bold">
+              <span>نشاط:</span>
+              <span>{businessTypeLabels[businessType] || 'سوبر ماركت'}</span>
+            </div>
             <OnlineStatus />
             <ThemeToggle />
           </div>

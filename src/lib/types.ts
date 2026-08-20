@@ -1,5 +1,5 @@
-// Leopard POS - TypeScript type definitions
-// All database entity types
+// APR System - TypeScript type definitions
+// All database entity types and business profiles
 
 export type StoreStatus = 'active' | 'inactive'
 export type ItemStatus = 'active' | 'inactive' | 'archived'
@@ -17,6 +17,9 @@ export type ResourceType = 'page' | 'operation' | 'ui_element'
 export type StocktakingStatus = 'draft' | 'in_progress' | 'completed' | 'cancelled'
 export type TransferStatus = 'pending' | 'completed' | 'cancelled'
 
+// Dynamic Business Type Profiles
+export type BusinessType = 'supermarket' | 'general' | 'pharmacy' | 'clothing' | 'restaurant'
+
 // ============================================================
 // Foundation
 // ============================================================
@@ -25,7 +28,7 @@ export interface Store {
   id: string
   owner_id: string
   name: string
-  business_type: string
+  business_type: BusinessType | string
   status: StoreStatus
   currency: string
   tax_rate: number
@@ -75,9 +78,17 @@ export interface Item {
   manage_inventory: boolean
   not_for_sale: boolean
   low_stock_alert: number
+  allow_decimal?: boolean // للوزن والكسور المنضبطة
   image_url?: string
   search_text: string
   status: ItemStatus
+  // Pharmacy-specific fields (only visible/used if business_type === 'pharmacy')
+  scientific_name?: string
+  active_ingredient?: string
+  prescription_required?: boolean
+  // Clothing-specific fields
+  size?: string
+  color?: string
   created_at: string
   updated_at: string
 }
@@ -88,6 +99,9 @@ export interface ItemBarcode {
   item_id: string
   barcode: string
   is_primary: boolean
+  unit_name?: string
+  conversion_factor?: number
+  price_override?: number
   created_at: string
 }
 
@@ -98,6 +112,7 @@ export interface ItemUnit {
   level: number
   unit_name: string
   qty_in_parent: number
+  conversion_factor?: number
   parent_unit?: string
   barcode?: string
   sell_price?: number
@@ -110,6 +125,9 @@ export interface StockBalance {
   item_id: string
   branch_id: string
   quantity: number
+  reserved_quantity?: number
+  avg_cost?: number
+  last_cost?: number
   updated_at: string
 }
 
@@ -180,6 +198,10 @@ export interface PurchaseLine {
   sell_price: number
   discount: number
   net_total: number
+  unit_name?: string
+  conversion_factor?: number
+  batch_number?: string
+  expiry_date?: string
 }
 
 export interface PurchaseReturn {
@@ -203,14 +225,16 @@ export interface PurchaseReturnLine {
   id: string
   store_id: string
   return_id: string
+  purchase_line_id?: string
   item_id: string
   quantity: number
-  buy_price: number
+  unit_price?: number
+  buy_price?: number
   total: number
 }
 
 // ============================================================
-// Customers & Sales
+// Sales & POS
 // ============================================================
 
 export interface Customer {
@@ -220,7 +244,10 @@ export interface Customer {
   phone?: string
   email?: string
   address?: string
+  tax_number?: string
+  points?: number
   balance: number
+  credit_limit?: number
   status: string
   created_at: string
   updated_at: string
@@ -239,10 +266,14 @@ export interface Sale {
   subtotal: number
   discount_total: number
   tax_total: number
+  round_diff: number
   total: number
   paid_amount: number
+  change_amount: number
   due_amount: number
   sale_date: string
+  shift_id?: string
+  cashier_id?: string
   device_id?: string
   notes?: string
   created_by?: string
@@ -255,24 +286,31 @@ export interface SaleLine {
   store_id: string
   sale_id: string
   item_id: string
-  item_name: string
+  item_name?: string
   quantity: number
   unit_price: number
+  cost_price: number
   discount: number
+  tax: number
   net_total: number
+  unit_name?: string
+  conversion_factor?: number
 }
 
-export interface SalesReturn {
+export interface SaleReturn {
   id: string
   store_id: string
   branch_id: string
   sale_id?: string
   return_number: string
   invoice_number?: string
+  sale_invoice_number?: string
+  customer_id?: string
   customer_name: string
   return_type: ReturnType
   total: number
   refund_amount: number
+  refund_method?: PaymentMethod
   reason?: string
   return_date: string
   created_by?: string
@@ -280,53 +318,63 @@ export interface SalesReturn {
   updated_at: string
 }
 
-export interface SalesReturnLine {
+export interface SaleReturnLine {
   id: string
   store_id: string
   return_id: string
+  sale_line_id?: string
   item_id: string
   quantity: number
   unit_price: number
   total: number
 }
 
-// ============================================================
-// Operations
-// ============================================================
+// Aliases
+export type SalesReturn = SaleReturn
+export type SalesReturnLine = SaleReturnLine
 
-export interface CashTransaction {
-  id: string
-  store_id: string
-  branch_id?: string
-  transaction_type: string
-  direction: TransactionDirection
-  amount: number
-  payment_method: PaymentMethod
-  account_name: string
-  source_table?: string
-  source_id?: string
-  notes?: string
-  created_by?: string
-  created_at: string
-}
+// ============================================================
+// Cashier & Shifts
+// ============================================================
 
 export interface CashierShift {
   id: string
   store_id: string
   branch_id: string
-  employee_name?: string
-  device_id?: string
+  cashier_id: string
+  cashier_name: string
+  opening_balance: number
+  closing_balance?: number
+  actual_cash?: number
+  cash_difference?: number
   status: ShiftStatus
-  opening_cash: number
-  expected_cash: number
-  closing_cash?: number
-  difference?: number
   opened_at: string
   closed_at?: string
-  opened_by?: string
-  closed_by?: string
-  notes?: string
 }
+
+export interface CashTransaction {
+  id: string
+  store_id: string
+  branch_id: string
+  shift_id?: string
+  cashier_id?: string
+  type?: 'sale' | 'sale_return' | 'purchase' | 'expense' | 'deposit' | 'withdrawal' | string
+  transaction_type?: string
+  direction?: 'in' | 'out' | string
+  amount: number
+  payment_method: PaymentMethod | string
+  account_name?: string
+  reference_type?: string
+  reference_id?: string
+  source_table?: string
+  source_id?: string
+  notes?: string
+  created_at: string
+}
+
+// ============================================================
+// Employees & RBAC
+// ============================================================
 
 export interface Employee {
   id: string
@@ -360,11 +408,15 @@ export interface RolePermission {
   allowed: boolean
 }
 
-export interface Stocktaking {
+// ============================================================
+// Stocktaking & Transfers
+// ============================================================
+
+export interface StocktakingSession {
   id: string
   store_id: string
   branch_id: string
-  stocktaking_number: string
+  session_number: string
   status: StocktakingStatus
   notes?: string
   created_by?: string
@@ -372,10 +424,12 @@ export interface Stocktaking {
   completed_at?: string
 }
 
+export type Stocktaking = StocktakingSession
+
 export interface StocktakingLine {
   id: string
   store_id: string
-  stocktaking_id: string
+  session_id: string
   item_id: string
   system_qty: number
   actual_qty: number
@@ -431,6 +485,7 @@ export interface CartItem {
   net_total: number
   unit: string
   available_stock: number
+  allow_decimal?: boolean
 }
 
 export interface CartState {

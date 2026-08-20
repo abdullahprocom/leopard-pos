@@ -127,7 +127,7 @@ export default function DashboardPage() {
             نظام الكاشير والمخازن المتكامل (Offline-First)
           </div>
           <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white">
-            مرحباً بك في نظام Leopard POS
+            مرحباً بك في منظومة APR System المحاسبية
           </h1>
           <p className="text-slate-300 mt-2 text-xs sm:text-sm font-medium max-w-2xl">
             إدارة فورية للمخزون، نقاط البيع السريعة، فواتير الشراء والطباعة الحرارية مع دعم العمل دون إنترنت.

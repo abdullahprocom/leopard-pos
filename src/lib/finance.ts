@@ -1,9 +1,10 @@
-// Leopard POS - Financial utility functions
-// Core calculations used across sales, purchases, and reports
+// APR System - Financial & Calculation utility functions
+// Strict Validation: Zero Negatives, Safe Decimal & Integer Quantities
 
-/** Round to 2 decimal places */
+/** Round strictly to 2 decimal places */
 export function money(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100
+  const n = Number(value) || 0
+  return Math.round((n + Number.EPSILON) * 100) / 100
 }
 
 /** Convert any value to a safe positive number */
@@ -12,9 +13,36 @@ export function toNumber(value: unknown): number {
   return isNaN(num) ? 0 : num
 }
 
-/** Ensure value is positive or zero */
+/** Ensure value is strictly positive or zero */
 export function positive(value: unknown): number {
   return Math.max(toNumber(value), 0)
+}
+
+/**
+ * Strict Quantity Sanitizer:
+ * - If allowDecimal is false (pieces, boxes): Strict Positive Integer (1, 2, 3...)
+ * - If allowDecimal is true (kg, liters, weighed items): Strict Positive Float (max 3 decimals, min 0.001)
+ */
+export function cleanPositiveQuantity(qty: unknown, allowDecimal: boolean = false): number {
+  const val = Math.abs(toNumber(qty))
+  if (val <= 0) return allowDecimal ? 0.001 : 1
+  if (!allowDecimal) {
+    return Math.max(1, Math.floor(val))
+  }
+  return Math.max(0.001, Math.round((val + Number.EPSILON) * 1000) / 1000)
+}
+
+/** Strict Price Sanitizer: Never negative, max 2 decimals */
+export function cleanPositivePrice(price: unknown): number {
+  const val = Math.abs(toNumber(price))
+  return money(val)
+}
+
+/** Strict Discount Sanitizer: Between 0 and maxBase */
+export function cleanPositiveDiscount(discount: unknown, maxBase: number): number {
+  const val = Math.abs(toNumber(discount))
+  const safeBase = Math.max(0, money(maxBase))
+  return money(Math.min(val, safeBase))
 }
 
 /** Calculate discount amount from type and value */
@@ -23,28 +51,32 @@ export function calcDiscount(
   value: number,
   base: number
 ): number {
+  const safeBase = positive(base)
   if (type === 'percent') {
-    return money(Math.min(base * (positive(value) / 100), base))
+    const percent = Math.min(positive(value), 100)
+    return money(safeBase * (percent / 100))
   }
-  return money(Math.min(positive(value), base))
+  return money(Math.min(positive(value), safeBase))
 }
 
-/** Settle payment and determine status */
+/** Settle payment and determine status with strict non-negative rules */
 export function settlePayment(total: number, paidAmount: number) {
-  const paid = money(positive(paidAmount))
   const safeTotal = money(positive(total))
+  const paid = money(positive(paidAmount))
   const due = money(Math.max(safeTotal - paid, 0))
+  const change = money(Math.max(paid - safeTotal, 0))
+  
   let status: 'paid' | 'partial' | 'unpaid'
 
-  if (paid >= safeTotal) {
+  if (paid >= safeTotal && safeTotal > 0) {
     status = 'paid'
-  } else if (paid > 0) {
+  } else if (paid > 0 && paid < safeTotal) {
     status = 'partial'
   } else {
-    status = 'unpaid'
+    status = safeTotal === 0 ? 'paid' : 'unpaid'
   }
 
-  return { paidAmount: paid, dueAmount: due, paymentStatus: status }
+  return { paidAmount: paid, dueAmount: due, changeAmount: change, paymentStatus: status }
 }
 
 /** Generate sequential number with prefix */
@@ -56,7 +88,7 @@ export function generateSequenceNumber(prefix: string): string {
 
 /** Generate invoice number */
 export function generateInvoiceNumber(): string {
-  return generateSequenceNumber('INV')
+  return generateSequenceNumber('APR-INV')
 }
 
 /** Generate sale number (alias for invoice number) */
@@ -64,22 +96,22 @@ export const generateSaleNumber = generateInvoiceNumber
 
 /** Generate purchase number */
 export function generatePurchaseNumber(): string {
-  return generateSequenceNumber('PUR')
+  return generateSequenceNumber('APR-PUR')
 }
 
 /** Generate return number */
 export function generateReturnNumber(type: 'sale' | 'purchase'): string {
-  return generateSequenceNumber(type === 'sale' ? 'SRT' : 'PRT')
+  return generateSequenceNumber(type === 'sale' ? 'APR-SRT' : 'APR-PRT')
 }
 
 /** Generate transfer number */
 export function generateTransferNumber(): string {
-  return generateSequenceNumber('TRF')
+  return generateSequenceNumber('APR-TRF')
 }
 
 /** Generate stocktaking number */
 export function generateStocktakingNumber(): string {
-  return generateSequenceNumber('STK')
+  return generateSequenceNumber('APR-STK')
 }
 
 /** Format currency with Arabic locale */
@@ -88,7 +120,8 @@ export function formatCurrency(amount: number, currency = 'EGP'): string {
     style: 'currency',
     currency,
     minimumFractionDigits: 2,
-  }).format(amount)
+    maximumFractionDigits: 2,
+  }).format(money(positive(amount)))
 }
 
 /** Format number with Arabic locale */
@@ -96,5 +129,5 @@ export function formatNumber(num: number, decimals = 0): string {
   return new Intl.NumberFormat('ar-EG', {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
-  }).format(num)
+  }).format(positive(num))
 }
