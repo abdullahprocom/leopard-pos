@@ -60,8 +60,8 @@ export function Dialog({ open, onClose, title, children, className }: DialogProp
       onClick={handleBackdropClick}
       onKeyDown={handleKeyDown}
       className={cn(
-        "backdrop:bg-black/50 backdrop:backdrop-blur-sm",
-        "rounded-xl border border-slate-200 bg-white p-0 shadow-lg",
+        "backdrop:bg-black/60 backdrop:backdrop-blur-xs",
+        "rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-0 shadow-2xl text-slate-900 dark:text-slate-100",
         "w-full max-w-lg",
         "open:animate-in open:fade-in-90 open:zoom-in-95",
         "rtl:text-right",
@@ -70,8 +70,8 @@ export function Dialog({ open, onClose, title, children, className }: DialogProp
     >
       <div className="flex flex-col p-6 space-y-4">
         {title && (
-          <div className="flex flex-col space-y-1.5 text-center sm:text-right">
-            <h2 className="text-lg font-semibold leading-none tracking-tight">
+          <div className="flex flex-col space-y-1.5 text-right border-b border-slate-100 dark:border-slate-800 pb-3">
+            <h2 className="text-lg font-black text-slate-900 dark:text-white leading-none tracking-tight">
               {title}
             </h2>
           </div>

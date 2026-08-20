@@ -54,13 +54,13 @@ export const SelectTrigger = React.forwardRef<HTMLButtonElement, SelectTriggerPr
         type="button"
         onClick={() => context.setOpen(!context.open)}
         className={cn(
-          'flex h-10 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-600 disabled:cursor-not-allowed disabled:opacity-50 text-right',
+          'flex h-11 w-full items-center justify-between rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 px-4 py-2 text-sm font-medium text-slate-900 dark:text-slate-100 shadow-xs placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600/30 focus:border-blue-600 disabled:cursor-not-allowed disabled:opacity-50 text-right cursor-pointer transition-colors',
           className
         )}
         {...props}
       >
         <span className="truncate">{children}</span>
-        <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+        <ChevronDown className="h-4 w-4 opacity-60 shrink-0 text-slate-400" />
       </button>
     )
   }
@@ -82,7 +82,7 @@ export function SelectContent({ className, children }: { className?: string; chi
       <div className="fixed inset-0 z-40" onClick={() => context.setOpen(false)} />
       <div
         className={cn(
-          'absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border border-slate-200 bg-white p-1 text-slate-950 shadow-md',
+          'absolute z-50 mt-1.5 max-h-60 w-full overflow-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-1.5 text-slate-900 dark:text-slate-100 shadow-xl',
           className
         )}
       >
@@ -110,8 +110,8 @@ export function SelectItem({
     <div
       onClick={() => context.onValueChange?.(value)}
       className={cn(
-        'relative flex w-full cursor-pointer select-none items-center rounded-sm py-2 px-3 text-sm outline-none hover:bg-slate-100 transition-colors',
-        isSelected && 'bg-blue-50 text-blue-700 font-semibold',
+        'relative flex w-full cursor-pointer select-none items-center rounded-lg py-2.5 px-3 text-sm font-medium outline-none hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors',
+        isSelected && 'bg-blue-600 text-white font-bold hover:bg-blue-600 dark:hover:bg-blue-600',
         className
       )}
     >

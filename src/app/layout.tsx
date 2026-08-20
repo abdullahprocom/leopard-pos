@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#1e3a8a",
+  themeColor: "#090d16",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -17,8 +17,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ar" dir="rtl" className="h-full antialiased">
-      <body className="min-h-full flex flex-col font-sans">
+    <html lang="ar" dir="rtl" className="dark h-full antialiased">
+      <body className="min-h-full flex flex-col font-sans bg-slate-950 text-slate-100">
         {children}
         <Toaster position="top-center" richColors dir="rtl" />
       </body>
