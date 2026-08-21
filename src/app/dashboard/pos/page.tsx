@@ -1,18 +1,19 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
 import { db, getDeviceId } from '@/lib/db'
 import { generateSaleNumber, cleanPositiveQuantity, cleanPositivePrice, cleanPositiveDiscount, money, formatCurrency } from '@/lib/finance'
 import { syncEngine, DEFAULT_STORE_UUID, DEFAULT_BRANCH_UUID } from '@/lib/sync-engine'
 import { useStore } from '@/lib/store-context'
 import { toast } from 'sonner'
-import { Search, Plus, Minus, Trash2, ShoppingCart, CreditCard, Banknote, X, CheckCircle2, User, Sparkles, Printer, RotateCcw, Scale, Weight } from 'lucide-react'
+import { Search, Plus, Minus, Trash2, ShoppingCart, CreditCard, Banknote, X, CheckCircle2, User, Sparkles, Printer, RotateCcw, Scale, Weight, Tag, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { WeightScaleModal } from '@/components/WeightScaleModal'
 import { ThermalReceipt } from './receipt'
-import type { Sale, SaleLine, CashTransaction } from '@/lib/types'
+import type { Sale, SaleLine, CashTransaction, Customer } from '@/lib/types'
 
 interface CartItem {
   id: string
@@ -30,16 +31,31 @@ export default function POSPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [cart, setCart] = useState<CartItem[]>([])
   const [customerName, setCustomerName] = useState('عميل نقدي')
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('cash')
   const [paidAmount, setPaidAmount] = useState<string>('')
   const [lastSale, setLastSale] = useState<any>(null)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [selectedCatId, setSelectedCatId] = useState<string>('all')
 
   // Scale Modal State
   const [scaleModalOpen, setScaleModalOpen] = useState(false)
   const [scaleItem, setScaleItem] = useState<any>(null)
 
   const searchInputRef = useRef<HTMLInputElement>(null)
+
+  // Live queries for quick product touch grid & customers
+  const allItems = useLiveQuery(() => db.items.filter(i => i.status === 'active').toArray()) || []
+  const allCategories = useLiveQuery(() => db.categories.toArray()) || []
+  const allCustomers = useLiveQuery(() => db.customers.toArray()) || []
+
+  // Filter items for quick grid
+  const quickItems = useMemo(() => {
+    if (selectedCatId === 'all') {
+      return allItems.slice(0, 18)
+    }
+    return allItems.filter(i => i.category_id === selectedCatId).slice(0, 18)
+  }, [allItems, selectedCatId])
 
   // Focus search input on load & listen for F-keys shortcuts
   useEffect(() => {
@@ -84,17 +100,21 @@ export default function POSPage() {
       }
 
       if (item) {
-        if (item.allow_decimal) {
-          // Open Smart Scale Calculator immediately for weight-based items
-          setScaleItem(item)
-          setScaleModalOpen(true)
-        } else {
-          addToCart(item, 1)
-        }
+        handleItemClick(item)
         setSearchTerm('')
       } else {
         toast.error('لم يتم العثور على الصنف - تأكد من قراءة الباركود أو كتابة الاسم بشكل صحيح')
       }
+    }
+  }
+
+  const handleItemClick = (item: any) => {
+    if (item.allow_decimal) {
+      // Open Smart Scale Calculator immediately for weight-based items
+      setScaleItem(item)
+      setScaleModalOpen(true)
+    } else {
+      addToCart(item, 1)
     }
   }
 
@@ -126,7 +146,7 @@ export default function POSPage() {
         allow_decimal: allowDec
       }]
     })
-    toast.success(`تمت إضافة: ${item.name} (${validQty} ${allowDec ? 'كجم' : 'قطعة'})`, { duration: 1500 })
+    toast.success(`تمت إضافة: ${item.name} (${validQty} ${allowDec ? 'كجم' : 'قطعة'})`, { duration: 1200 })
   }
 
   const handleOpenScaleForCartItem = (cartItem: CartItem) => {
@@ -173,7 +193,7 @@ export default function POSPage() {
   const updateQuantity = (id: string, delta: number) => {
     setCart(prev => prev.map(item => {
       if (item.id === id) {
-        const step = item.allow_decimal ? 0.250 : 1 // Step by 250g for weight items
+        const step = item.allow_decimal ? 0.250 : 1
         const newQty = cleanPositiveQuantity(item.quantity + (delta > 0 ? step : -step), item.allow_decimal)
         const newTotal = money(newQty * item.unit_price - item.discount)
         return { ...item, quantity: newQty, total: Math.max(0, newTotal) }
@@ -182,27 +202,15 @@ export default function POSPage() {
     }))
   }
 
-  const handleSetDirectQuantity = (id: string, val: string) => {
-    setCart(prev => prev.map(item => {
-      if (item.id === id) {
-        const parsed = Math.max(0, parseFloat(val) || 0)
-        const newQty = cleanPositiveQuantity(parsed, item.allow_decimal)
-        const newTotal = money(newQty * item.unit_price - item.discount)
-        return { ...item, quantity: newQty, total: Math.max(0, newTotal) }
-      }
-      return item
-    }))
-  }
+  const handleSetDirectQuantity = (id: string, rawVal: string) => {
+    const item = cart.find(i => i.id === id)
+    if (!item) return
+    const parsed = parseFloat(rawVal)
+    if (isNaN(parsed) || parsed < 0) return
 
-  const updateItemDiscount = (id: string, amount: number) => {
-    setCart(prev => prev.map(item => {
-      if (item.id === id) {
-        const maxBase = item.quantity * item.unit_price
-        const cleanDisc = cleanPositiveDiscount(amount, maxBase)
-        return { ...item, discount: cleanDisc, total: Math.max(0, money(maxBase - cleanDisc)) }
-      }
-      return item
-    }))
+    const newQty = cleanPositiveQuantity(parsed, item.allow_decimal)
+    const newTotal = money(newQty * item.unit_price - item.discount)
+    setCart(prev => prev.map(i => i.id === id ? { ...i, quantity: newQty, total: Math.max(0, newTotal) } : i))
   }
 
   const removeFromCart = (id: string) => {
@@ -211,31 +219,30 @@ export default function POSPage() {
 
   const clearCart = () => {
     setCart([])
-    setCustomerName('عميل نقدي')
     setPaidAmount('')
-    setPaymentMethod('cash')
-    if (searchInputRef.current) searchInputRef.current.focus()
+    setCustomerName('عميل نقدي')
+    setSelectedCustomerId(null)
   }
 
-  // Pure strict non-negative totals
-  const subtotal = money(cart.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0))
-  const totalDiscount = money(cart.reduce((sum, item) => sum + item.discount, 0))
-  const totalAmount = Math.max(0, money(subtotal - totalDiscount))
-  const parsedPaid = paidAmount !== '' ? cleanPositivePrice(paidAmount) : totalAmount
+  // Calculations
+  const subtotal = money(cart.reduce((sum, i) => sum + (i.quantity * i.unit_price), 0))
+  const totalDiscount = money(cart.reduce((sum, i) => sum + i.discount, 0))
+  const totalAmount = money(Math.max(0, subtotal - totalDiscount))
+
+  const parsedPaid = paidAmount === '' ? totalAmount : Math.max(0, parseFloat(paidAmount) || 0)
   const change = Math.max(0, money(parsedPaid - totalAmount))
 
+  // Complete and save invoice
   const handleCompleteSale = async () => {
     if (cart.length === 0) {
-      toast.error('عربة التسوق فارغة! أضف أصنافاً أولاً')
+      toast.error('السلة فارغة، يرجى إضافة أصناف أولاً')
       return
     }
 
-    if (isProcessing) return
-
     try {
       setIsProcessing(true)
-      const saleId = crypto.randomUUID()
       const now = new Date().toISOString()
+      const saleId = crypto.randomUUID()
       const saleNumber = generateSaleNumber()
       const activeStoreId = storeId || DEFAULT_STORE_UUID
       const activeBranchId = branchId || DEFAULT_BRANCH_UUID
@@ -244,7 +251,7 @@ export default function POSPage() {
         id: saleId,
         store_id: activeStoreId,
         branch_id: activeBranchId,
-        customer_id: undefined,
+        customer_id: selectedCustomerId || undefined,
         invoice_number: saleNumber,
         status: 'invoice',
         subtotal,
@@ -348,15 +355,17 @@ export default function POSPage() {
         })),
         subtotal,
         discount: totalDiscount,
-        tax: 0,
         total: totalAmount,
         paid: parsedPaid,
-        change
+        change,
+        paymentMethod
       }
 
       setLastSale(receiptData)
-      toast.success(`تم حفظ الفاتورة ${saleNumber} بنجاح!`)
-      
+      toast.success(`تم إتمام الفاتورة ${saleNumber} بنجاح`, {
+        icon: <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+      })
+
       // Clear cart for next customer
       clearCart()
 
@@ -376,7 +385,7 @@ export default function POSPage() {
   return (
     <div className="h-full flex flex-col gap-4 pb-20 select-none" dir="rtl">
       
-      {/* Top Bar: Barcode Scan & Search */}
+      {/* Top Bar: Barcode Scan & Search & Customer */}
       <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-sm flex flex-col md:flex-row items-center gap-3">
         <div className="relative flex-1 w-full">
           <Search className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
@@ -392,6 +401,7 @@ export default function POSPage() {
         </div>
 
         <div className="flex items-center gap-2 w-full md:w-auto">
+          {/* Customer Selection */}
           <div className="relative w-full md:w-64">
             <User className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
@@ -414,6 +424,69 @@ export default function POSPage() {
         </div>
       </div>
 
+      {/* Quick Visual Product Touch Gallery (for Touchscreens & Fast Selection) */}
+      <div className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-sm space-y-3">
+        {/* Category Tabs */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+          <button
+            type="button"
+            onClick={() => setSelectedCatId('all')}
+            className={`px-4 py-2 rounded-xl text-xs font-black shrink-0 transition-all cursor-pointer ${
+              selectedCatId === 'all'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+            }`}
+          >
+            جميع الأصناف ({allItems.length})
+          </button>
+          {allCategories.map(cat => (
+            <button
+              key={cat.id}
+              type="button"
+              onClick={() => setSelectedCatId(cat.id)}
+              className={`px-4 py-2 rounded-xl text-xs font-black shrink-0 transition-all cursor-pointer ${
+                selectedCatId === cat.id
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+              }`}
+            >
+              {cat.name}
+            </button>
+          ))}
+        </div>
+
+        {/* Quick Items Grid */}
+        {quickItems.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5 max-h-[140px] overflow-y-auto p-1">
+            {quickItems.map(item => {
+              const isWeight = Boolean(item.allow_decimal)
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => handleItemClick(item)}
+                  className="flex flex-col justify-between p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:border-blue-300 dark:hover:border-blue-700 transition-all text-right active:scale-95 cursor-pointer group"
+                >
+                  <p className="text-xs font-bold text-slate-900 dark:text-white truncate w-full group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                    {item.name}
+                  </p>
+                  <div className="flex items-center justify-between w-full mt-1.5 pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
+                    <span className="text-xs font-black text-blue-600 dark:text-blue-400" dir="ltr">
+                      {cleanPositivePrice(item.sell_price).toFixed(2)} ج.م
+                    </span>
+                    {isWeight && (
+                      <span className="text-[10px] bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded font-bold">
+                        ميزان
+                      </span>
+                    )}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
       {/* Main Grid: Cart Items (Left/Center) & Payment Terminal (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0">
         
@@ -429,9 +502,9 @@ export default function POSPage() {
 
           <div className="flex-1 overflow-y-auto p-2">
             {cart.length === 0 ? (
-              <div className="h-full min-h-[300px] flex flex-col items-center justify-center text-slate-400 space-y-3">
+              <div className="h-full min-h-[260px] flex flex-col items-center justify-center text-slate-400 space-y-3">
                 <ShoppingCart className="w-16 h-16 stroke-1 opacity-40 text-blue-500" />
-                <p className="font-bold text-base text-slate-400">السلة فارغة، قم بمسح باركود لبدء الفاتورة</p>
+                <p className="font-bold text-base text-slate-400">السلة فارغة، امسح باركود أو اضغط على صنف للإضافة</p>
                 <span className="text-xs bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full font-mono text-slate-400">
                   اختصار لوحة المفاتيح: F2 للبحث، F9 للحفظ والطباعة
                 </span>
@@ -550,9 +623,8 @@ export default function POSPage() {
                 }`}
               >
                 <Banknote className="w-4 h-4" />
-                <span>نقدي (Cash)</span>
+                <span>نقدي (كاش)</span>
               </button>
-
               <button
                 type="button"
                 onClick={() => setPaymentMethod('card')}
@@ -563,78 +635,102 @@ export default function POSPage() {
                 }`}
               >
                 <CreditCard className="w-4 h-4" />
-                <span>فيزا / كارت</span>
+                <span>فيزا / بطاقة</span>
               </button>
             </div>
 
-            {/* Calculation Totals */}
-            <div className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 space-y-2.5">
-              <div className="flex justify-between text-sm text-slate-600 dark:text-slate-400 font-semibold">
+            {/* Amounts Summary */}
+            <div className="space-y-2.5 pt-2 text-sm">
+              <div className="flex justify-between text-slate-500 dark:text-slate-400 font-bold">
                 <span>المجموع الفرعي:</span>
-                <span className="font-mono">{subtotal.toFixed(2)} ج.م</span>
+                <span className="font-mono text-slate-900 dark:text-white" dir="ltr">{subtotal.toFixed(2)} ج.م</span>
               </div>
               {totalDiscount > 0 && (
-                <div className="flex justify-between text-sm text-rose-500 font-semibold">
-                  <span>إجمالي الخصم:</span>
-                  <span className="font-mono">-{totalDiscount.toFixed(2)} ج.م</span>
+                <div className="flex justify-between text-rose-500 font-bold">
+                  <span>الخصم الإجمالي:</span>
+                  <span className="font-mono" dir="ltr">-{totalDiscount.toFixed(2)} ج.م</span>
                 </div>
               )}
-              <div className="border-t border-slate-200 dark:border-slate-700 pt-2 flex justify-between items-center">
-                <span className="text-base font-black text-slate-900 dark:text-white">المبلغ المطلوب:</span>
-                <span className="text-3xl font-black text-blue-600 dark:text-blue-400 font-mono">
-                  {totalAmount.toFixed(2)} <span className="text-sm font-bold">ج.م</span>
-                </span>
+              <div className="flex justify-between text-xl font-black text-slate-900 dark:text-white border-t border-slate-100 dark:border-slate-800 pt-3">
+                <span>المطلوب دفعه:</span>
+                <span className="font-mono text-2xl text-blue-600 dark:text-blue-400" dir="ltr">{totalAmount.toFixed(2)} ج.م</span>
               </div>
             </div>
 
-            {/* Cash Input */}
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                  المبلغ المدفوع من العميل:
-                </Label>
+            {/* Paid Amount Input */}
+            <div className="space-y-2 pt-2">
+              <Label className="text-xs font-bold text-slate-500 dark:text-slate-400 block mb-1">المبلغ المستلم من العميل</Label>
+              <div className="relative">
                 <Input
-                  type="number"
-                  min="0"
-                  step="0.5"
-                  placeholder="مثال: 0"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder={totalAmount > 0 ? totalAmount.toFixed(2) : '0.00'}
                   value={paidAmount}
-                  onChange={e => setPaidAmount(e.target.value)}
-                  className="h-12 text-lg font-mono font-bold text-center bg-slate-50/80 dark:bg-slate-800/80 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl"
+                  onChange={(e) => {
+                    const clean = e.target.value.replace(/[^0-9.]/g, '')
+                    setPaidAmount(clean)
+                  }}
+                  className="h-12 pl-12 text-lg font-mono font-black bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700"
                 />
-              </div>
-
-              <div className="flex justify-between items-center p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400">
-                <span className="text-xs font-bold">المتبقي للعميل (الفكة):</span>
-                <span className="text-lg font-black font-mono">{change.toFixed(2)} ج.م</span>
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">ج.م</span>
               </div>
             </div>
+
+            {/* Change Remaining */}
+            {parsedPaid > totalAmount && totalAmount > 0 && (
+              <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl flex items-center justify-between text-emerald-800 dark:text-emerald-300">
+                <span className="font-bold text-sm">المتبقي للعميل (الفكة):</span>
+                <span className="font-mono font-black text-xl" dir="ltr">{change.toFixed(2)} ج.م</span>
+              </div>
+            )}
           </div>
 
+          {/* Complete Button */}
           <Button
+            type="button"
             size="lg"
-            onClick={handleCompleteSale}
             disabled={cart.length === 0 || isProcessing}
-            className="w-full h-16 text-lg font-black bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl shadow-xl shadow-emerald-600/30 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+            onClick={handleCompleteSale}
+            className="w-full h-14 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-lg rounded-xl shadow-lg shadow-emerald-600/30 transition-all active:scale-98 cursor-pointer flex items-center justify-center gap-2"
           >
-            <CheckCircle2 className="w-6 h-6 ml-2" />
-            {isProcessing ? 'جاري الحفظ...' : `إتمام الفاتورة والطباعة (${totalAmount.toFixed(2)} ج.م)`}
+            {isProcessing ? (
+              <span>جاري الحفظ...</span>
+            ) : (
+              <>
+                <Printer className="w-5 h-5" />
+                <span>إتمام الفاتورة والطباعة (F9)</span>
+              </>
+            )}
           </Button>
         </div>
       </div>
 
-      {/* Weight & Cash Calculator Modal */}
-      <WeightScaleModal
-        isOpen={scaleModalOpen}
-        onClose={() => setScaleModalOpen(false)}
-        item={scaleItem}
-        onConfirm={handleScaleConfirm}
-      />
+      {/* Smart Weight Scale Modal */}
+      {scaleItem && (
+        <WeightScaleModal
+          isOpen={scaleModalOpen}
+          onClose={() => setScaleModalOpen(false)}
+          item={scaleItem}
+          onConfirm={handleScaleConfirm}
+        />
+      )}
 
-      {/* Hidden thermal receipt for printing */}
+      {/* Hidden Thermal Receipt for Print */}
       {lastSale && (
         <div className="hidden print:block">
-          <ThermalReceipt {...lastSale} />
+          <ThermalReceipt
+            storeName={lastSale.storeName}
+            invoiceNumber={lastSale.invoiceNumber}
+            date={lastSale.date}
+            customerName={lastSale.customerName}
+            items={lastSale.items}
+            subtotal={lastSale.subtotal}
+            discount={lastSale.discount}
+            tax={0}
+            total={lastSale.total}
+            paid={lastSale.paid}
+            change={lastSale.change}
+          />
         </div>
       )}
     </div>

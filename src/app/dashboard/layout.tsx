@@ -21,6 +21,7 @@ import {
   Menu,
   X,
   ShieldCheck,
+  BarChart3,
 } from 'lucide-react'
 import { OnlineStatus } from '@/components/OnlineStatus'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -30,6 +31,7 @@ import { useStore } from '@/lib/store-context'
 const navLinks = [
   { label: 'الرئيسية', href: '/dashboard', icon: Home },
   { label: 'نقطة البيع (الكاشير)', href: '/dashboard/pos', icon: ShoppingCart, highlight: true },
+  { label: 'التقارير والأرباح', href: '/dashboard/reports', icon: BarChart3 },
   { label: 'الأصناف والمخزون', href: '/dashboard/items', icon: Package },
   { label: 'المشتريات', href: '/dashboard/purchases', icon: ShoppingBag },
   { label: 'مرتجع الشراء', href: '/dashboard/purchase-returns', icon: Undo2 },
