@@ -104,9 +104,9 @@ const groups: TileGroup[] = [
     title: 'نقاط البيع والعمليات',
     icon: Zap,
     tiles: [
-      { title: 'نقطة البيع (الكاشير)', icon: ShoppingCart, href: '/dashboard/pos', gradient: 'from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800' },
-      { title: 'سجل المبيعات', icon: Receipt, href: '/dashboard/sales', gradient: 'from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800' },
-      { title: 'مرتجع المبيعات', icon: RotateCcw, href: '/dashboard/sales-returns', gradient: 'from-rose-600 to-red-700 hover:from-rose-700 hover:to-red-800' },
+      { title: 'نقطة البيع (الكاشير)', icon: ShoppingCart, href: '/dashboard/pos', gradient: 'from-blue-600 to-indigo-600' },
+      { title: 'سجل المبيعات', icon: Receipt, href: '/dashboard/sales', gradient: 'from-emerald-600 to-teal-700' },
+      { title: 'مرتجع المبيعات', icon: RotateCcw, href: '/dashboard/sales-returns', gradient: 'from-red-600 to-rose-700' },
     ],
   },
   {
@@ -114,29 +114,29 @@ const groups: TileGroup[] = [
     title: 'المخزون والأصناف',
     icon: Boxes,
     tiles: [
-      { title: 'الأصناف والمخزون', icon: Package, href: '/dashboard/items', gradient: 'from-blue-600/90 to-blue-800 hover:from-blue-700 hover:to-blue-900' },
-      { title: 'الجرد والتسوية', icon: ClipboardList, href: '/dashboard/stocktaking', gradient: 'from-purple-600 to-violet-700 hover:from-purple-700 hover:to-violet-800' },
-      { title: 'التحويلات المخزنية', icon: ArrowLeftRight, href: '/dashboard/transfers', gradient: 'from-orange-600 to-amber-700 hover:from-orange-700 hover:to-amber-800' },
+      { title: 'الأصناف والمخزون', icon: Package, href: '/dashboard/items', gradient: 'from-blue-600 to-blue-700' },
+      { title: 'الجرد والتسوية', icon: ClipboardList, href: '/dashboard/stocktaking', gradient: 'from-purple-600 to-violet-700' },
+      { title: 'النقل المخزني', icon: ArrowLeftRight, href: '/dashboard/transfers', gradient: 'from-sky-600 to-cyan-700' },
     ],
   },
   {
     id: 'purchases',
-    title: 'المشتريات والتوريد',
+    title: 'المشتريات والموردين',
     icon: Truck,
     tiles: [
-      { title: 'المشتريات', icon: ShoppingBag, href: '/dashboard/purchases', gradient: 'from-sky-600 to-cyan-700 hover:from-sky-700 hover:to-cyan-800' },
-      { title: 'مرتجع المشتريات', icon: Undo2, href: '/dashboard/purchase-returns', gradient: 'from-pink-600 to-rose-700 hover:from-pink-700 hover:to-rose-800' },
-      { title: 'الموردين', icon: Building2, href: '/dashboard/suppliers', gradient: 'from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800' },
+      { title: 'فواتير المشتريات', icon: ShoppingBag, href: '/dashboard/purchases', gradient: 'from-amber-600 to-orange-600' },
+      { title: 'مرتجع الشراء', icon: Undo2, href: '/dashboard/purchase-returns', gradient: 'from-red-600 to-rose-700' },
+      { title: 'الشركات والموردين', icon: Building2, href: '/dashboard/suppliers', gradient: 'from-slate-700 to-slate-800' },
     ],
   },
   {
     id: 'admin',
-    title: 'الإدارة والأمان',
+    title: 'الإدارة والنظام',
     icon: ShieldCheck,
     tiles: [
-      { title: 'العملاء', icon: Users, href: '/dashboard/customers', gradient: 'from-cyan-600 to-sky-700 hover:from-cyan-700 hover:to-sky-800' },
-      { title: 'الموظفين والصلاحيات', icon: UserCog, href: '/dashboard/employees', gradient: 'from-indigo-600 to-blue-700 hover:from-indigo-700 hover:to-blue-800' },
-      { title: 'إعدادات النظام', icon: Settings, href: '/dashboard/settings', gradient: 'from-slate-500 to-slate-600 hover:from-slate-600 hover:to-slate-700' },
+      { title: 'دليل العملاء', icon: Users, href: '/dashboard/customers', gradient: 'from-indigo-600 to-purple-600' },
+      { title: 'الموظفين والصلاحيات', icon: UserCog, href: '/dashboard/employees', gradient: 'from-violet-600 to-purple-700' },
+      { title: 'إعدادات النظام', icon: Settings, href: '/dashboard/settings', gradient: 'from-slate-700 to-slate-800' },
     ],
   },
 ]
@@ -469,35 +469,46 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ─── Quick Access Tiles ─── */}
-      <div className="space-y-6">
-        <h2 className="text-xl font-black text-slate-900 dark:text-white">الوصول السريع</h2>
-        {groups.map(group => {
-          const GroupIcon = group.icon
-          return (
-            <div key={group.id}>
-              <h3 className="flex items-center gap-2 text-sm font-black text-slate-500 dark:text-slate-400 mb-3">
-                <GroupIcon className="w-4 h-4" />
-                {group.title}
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {group.tiles.map(tile => {
-                  const TileIcon = tile.icon
-                  return (
-                    <Link
-                      key={tile.href}
-                      href={tile.href}
-                      className={`flex items-center gap-3 p-4 rounded-xl bg-gradient-to-br ${tile.gradient} text-white font-bold shadow-md transition-all hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98]`}
-                    >
-                      <TileIcon className="w-6 h-6 shrink-0 opacity-90" />
-                      <span className="text-sm">{tile.title}</span>
-                    </Link>
-                  )
-                })}
+      {/* ─── Quick Access Big Cards Grid (4 Columns Layout) ─── */}
+      <div className="space-y-4 pt-2">
+        <h2 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+          <Zap className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+          الوصول السريع
+        </h2>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
+          {groups.map(group => {
+            const GroupIcon = group.icon
+            return (
+              <div key={group.id} className="flex flex-col gap-3">
+                <div className="flex items-center justify-center gap-2 text-xs font-black text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/80 py-2.5 px-3 rounded-xl border border-slate-200/80 dark:border-slate-700/60 text-center">
+                  <GroupIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  <span>{group.title}</span>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  {group.tiles.map(tile => {
+                    const TileIcon = tile.icon
+                    return (
+                      <Link
+                        key={tile.href}
+                        href={tile.href}
+                        className={`flex flex-col items-center justify-center p-6 rounded-2xl bg-gradient-to-br ${tile.gradient} text-white shadow-lg transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl active:scale-[0.98] min-h-[140px] group border border-white/10`}
+                      >
+                        <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center mb-3 shadow-inner group-hover:scale-110 transition-transform">
+                          <TileIcon className="w-7 h-7 text-white" />
+                        </div>
+                        <span className="text-base font-black text-center tracking-tight drop-shadow-xs">
+                          {tile.title}
+                        </span>
+                      </Link>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
-          )
-        })}
+            )
+          })}
+        </div>
       </div>
     </div>
   )
