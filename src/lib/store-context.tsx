@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { BusinessType } from './types'
 import { DEFAULT_STORE_UUID, DEFAULT_BRANCH_UUID, DEFAULT_USER_UUID } from './sync-engine'
+import { ensureDefaultCategories } from './db'
 
 interface StoreContextType {
   storeId: string | null
@@ -71,6 +72,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setIsActivated(true)
       }
     }
+
+    // 3. Ensure default categories
+    ensureDefaultCategories(DEFAULT_STORE_UUID)
 
     return () => {
       window.removeEventListener('online', handleOnline)

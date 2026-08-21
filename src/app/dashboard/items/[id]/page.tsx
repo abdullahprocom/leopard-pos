@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from '@/lib/db'
+import { db, ensureDefaultCategories } from '@/lib/db'
 import { syncEngine, DEFAULT_STORE_UUID, DEFAULT_BRANCH_UUID } from '@/lib/sync-engine'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { ArrowRight, Plus, Trash2, Save, Scale, AlertCircle } from 'lucide-react'
+import { ArrowRight, Plus, Trash2, Save, Scale, AlertCircle, FolderPlus, Check, X } from 'lucide-react'
 import { toast } from 'sonner'
 import type { ItemType, ItemStatus } from '@/lib/types'
 import { cleanPositivePrice, cleanPositiveQuantity, money } from '@/lib/finance'
@@ -30,6 +30,10 @@ export default function EditItemPage() {
   const [itemType, setItemType] = useState<ItemType>('stocked')
   const [status, setStatus] = useState<ItemStatus>('active')
   const [allowDecimal, setAllowDecimal] = useState(false)
+
+  // Inline category creation
+  const [isAddingCategory, setIsAddingCategory] = useState(false)
+  const [newCatName, setNewCatName] = useState('')
 
   // Pricing
   const [buyPrice, setBuyPrice] = useState('0')
@@ -54,7 +58,11 @@ export default function EditItemPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Fetch categories
+  // Fetch categories & ensure defaults
+  useEffect(() => {
+    ensureDefaultCategories(DEFAULT_STORE_UUID)
+  }, [])
+
   const categories = useLiveQuery(() => db.categories.toArray(), []) || []
 
   // Load existing item data
@@ -142,6 +150,36 @@ export default function EditItemPage() {
     newUnits.splice(index, 1)
     newUnits.forEach((u, i) => { u.level = i + 1 })
     setUnits(newUnits)
+  }
+
+  // Create quick category
+  const handleCreateCategory = async () => {
+    if (!newCatName.trim()) {
+      toast.error('يرجى كتابة اسم التصنيف')
+      return
+    }
+
+    try {
+      const newId = crypto.randomUUID()
+      const now = new Date().toISOString()
+      const catRecord = {
+        id: newId,
+        store_id: DEFAULT_STORE_UUID,
+        name: newCatName.trim(),
+        sort_order: categories.length + 1,
+        created_at: now
+      }
+
+      await db.categories.add(catRecord)
+      syncEngine.enqueueOperation('categories', 'INSERT', catRecord)
+
+      setCategoryId(newId)
+      setNewCatName('')
+      setIsAddingCategory(false)
+      toast.success(`تمت إضافة وتحديد تصنيف: ${catRecord.name}`)
+    } catch (err: any) {
+      toast.error('حدث خطأ أثناء إضافة التصنيف: ' + err.message)
+    }
   }
 
   const handleUpdate = async () => {
@@ -291,10 +329,11 @@ export default function EditItemPage() {
   }
 
   return (
-    <div className="space-y-6 pb-28 select-none" dir="rtl">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 pb-12 select-none" dir="rtl">
+      {/* Top Header */}
+      <div className="flex items-center justify-between bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-sm">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push('/dashboard/items')} className="h-10 w-10 shrink-0">
+          <Button variant="ghost" size="icon" onClick={() => router.push('/dashboard/items')} className="h-10 w-10 shrink-0 cursor-pointer">
             <ArrowRight className="h-6 w-6" />
           </Button>
           <div>
@@ -302,10 +341,18 @@ export default function EditItemPage() {
             <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold">تعديل الأسعار والوحدات والباركودات</p>
           </div>
         </div>
-        <Button variant="destructive" size="sm" onClick={handleDelete} disabled={isSubmitting} className="font-bold rounded-xl h-11 px-5 cursor-pointer">
-          <Trash2 className="ml-2 h-4 w-4" />
-          حذف المنتج
-        </Button>
+
+        {/* Quick inline action buttons in header */}
+        <div className="flex items-center gap-2">
+          <Button variant="destructive" size="sm" onClick={handleDelete} disabled={isSubmitting} className="font-bold rounded-xl h-10 px-4 cursor-pointer">
+            <Trash2 className="ml-1.5 h-4 w-4" />
+            حذف الصنف
+          </Button>
+          <Button size="sm" onClick={handleUpdate} disabled={isSubmitting} className="h-10 px-5 font-black bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-600/25 cursor-pointer">
+            <Save className="ml-1.5 h-4 w-4" />
+            حفظ التعديلات
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -315,40 +362,76 @@ export default function EditItemPage() {
             <CardHeader className="border-b border-slate-100 dark:border-slate-800/80 pb-4">
               <CardTitle className="text-lg font-black text-slate-900 dark:text-white">المعلومات الأساسية</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 pt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CardContent className="space-y-5 pt-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-2">
-                  <Label htmlFor="name" className="text-slate-900 dark:text-white font-bold text-sm">اسم المنتج (عربي) *</Label>
+                  <Label htmlFor="name" className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">اسم المنتج (عربي) *</Label>
                   <Input id="name" value={name} onChange={e => setName(e.target.value)} className="h-12 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 font-bold" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="nameEn" className="text-slate-900 dark:text-white font-bold text-sm">اسم المنتج (إنجليزي)</Label>
+                  <Label htmlFor="nameEn" className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">اسم المنتج (إنجليزي)</Label>
                   <Input id="nameEn" value={nameEn} onChange={e => setNameEn(e.target.value)} className="h-12 text-left bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 font-bold" dir="ltr" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="sku" className="text-slate-900 dark:text-white font-bold text-sm">كود الصنف (SKU)</Label>
+                  <Label htmlFor="sku" className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">كود الصنف (SKU)</Label>
                   <Input id="sku" value={sku} onChange={e => setSku(e.target.value)} className="h-12 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 font-mono font-bold" />
                 </div>
+
+                {/* Category with Inline Add */}
                 <div className="space-y-2">
-                  <Label className="text-slate-900 dark:text-white font-bold text-sm">التصنيف</Label>
-                  <Select value={categoryId} onValueChange={setCategoryId}>
-                    <SelectTrigger className="h-12 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 font-bold">
-                      <SelectValue placeholder="اختر التصنيف" />
-                    </SelectTrigger>
-                    <SelectContent className="dark:bg-slate-900 dark:border-slate-800">
-                      <SelectItem value="none">بدون تصنيف</SelectItem>
-                      {categories.map(cat => (
-                        <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label className="text-slate-900 dark:text-white font-bold text-sm block">التصنيف</Label>
+                    {!isAddingCategory && (
+                      <button
+                        type="button"
+                        onClick={() => setIsAddingCategory(true)}
+                        className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        <FolderPlus className="w-3.5 h-3.5" />
+                        + إضافة تصنيف جديد
+                      </button>
+                    )}
+                  </div>
+
+                  {isAddingCategory ? (
+                    <div className="flex items-center gap-2 p-2 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800">
+                      <Input
+                        placeholder="اكتب اسم التصنيف (مثال: أرز وبقوليات)..."
+                        value={newCatName}
+                        onChange={e => setNewCatName(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleCreateCategory())}
+                        className="h-10 bg-white dark:bg-slate-900 text-sm font-bold"
+                        autoFocus
+                      />
+                      <Button type="button" size="sm" onClick={handleCreateCategory} className="h-10 px-3 bg-blue-600 hover:bg-blue-700 text-white font-bold cursor-pointer shrink-0">
+                        <Check className="w-4 h-4" />
+                        حفظ
+                      </Button>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => setIsAddingCategory(false)} className="h-10 w-10 text-slate-400 hover:text-slate-600 cursor-pointer shrink-0">
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Select value={categoryId} onValueChange={setCategoryId}>
+                      <SelectTrigger className="h-12 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 font-bold">
+                        <SelectValue placeholder="اختر التصنيف" />
+                      </SelectTrigger>
+                      <SelectContent className="dark:bg-slate-900 dark:border-slate-800 max-h-60">
+                        <SelectItem value="none">بدون تصنيف</SelectItem>
+                        {categories.map(cat => (
+                          <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="manufacturer" className="text-slate-900 dark:text-white font-bold text-sm">الشركة المصنعة / المورد</Label>
+                  <Label htmlFor="manufacturer" className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">الشركة المصنعة / المورد</Label>
                   <Input id="manufacturer" value={manufacturer} onChange={e => setManufacturer(e.target.value)} className="h-12 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 font-bold" />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-slate-900 dark:text-white font-bold text-sm">الحالة</Label>
+                  <Label className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">الحالة</Label>
                   <Select value={status} onValueChange={(val: any) => setStatus(val)}>
                     <SelectTrigger className="h-12 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 font-bold">
                       <SelectValue placeholder="الحالة" />
@@ -385,19 +468,19 @@ export default function EditItemPage() {
               {units.map((unit, index) => (
                 <div key={index} className="flex flex-col sm:flex-row gap-4 p-4 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-800/30 relative">
                   {index > 0 && (
-                    <Button variant="ghost" size="icon" className="absolute top-2 left-2 text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40" onClick={() => removeUnit(index)}>
+                    <Button variant="ghost" size="icon" className="absolute top-2 left-2 text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer" onClick={() => removeUnit(index)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   )}
                   <div className="flex-1 space-y-2">
-                    <Label className="text-slate-900 dark:text-white font-bold text-sm">اسم الوحدة (المستوى {unit.level})</Label>
-                    <Input placeholder="مثال: قطعة، كيلو جرام، علبة، كرتونة" value={unit.unit_name} onChange={e => {
+                    <Label className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">اسم الوحدة (المستوى {unit.level})</Label>
+                    <Input placeholder="مثال: قطعة، كيلو جرام، باكت، شكارة، كرتونة" value={unit.unit_name} onChange={e => {
                       const newUnits = [...units]; newUnits[index].unit_name = e.target.value; setUnits(newUnits)
                     }} className="h-12 bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 font-bold" />
                   </div>
                   {index > 0 && (
                     <div className="flex-1 space-y-2">
-                      <Label className="text-slate-900 dark:text-white font-bold text-sm">يحتوي على كم {units[index - 1].unit_name || 'وحدة أصغر'}؟</Label>
+                      <Label className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">يحتوي على كم {units[index - 1].unit_name || 'وحدة أصغر'}؟</Label>
                       <Input 
                         type="text" 
                         inputMode="numeric"
@@ -419,7 +502,7 @@ export default function EditItemPage() {
                     </div>
                   )}
                   <div className="flex-1 space-y-2">
-                    <Label className="text-slate-900 dark:text-white font-bold text-sm">باركود الوحدة (اختياري)</Label>
+                    <Label className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">باركود الوحدة (اختياري)</Label>
                     <Input value={unit.barcode} onChange={e => {
                       const newUnits = [...units]; newUnits[index].barcode = e.target.value; setUnits(newUnits)
                     }} className="h-12 font-mono bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 font-bold" dir="ltr" />
@@ -427,9 +510,9 @@ export default function EditItemPage() {
                 </div>
               ))}
               {!allowDecimal && (
-                <Button type="button" variant="outline" onClick={addUnit} className="w-full h-12 border-slate-300 dark:border-slate-700 font-bold">
+                <Button type="button" variant="outline" onClick={addUnit} className="w-full h-12 border-slate-300 dark:border-slate-700 font-bold cursor-pointer">
                   <Plus className="ml-2 h-4 w-4" />
-                  إضافة مستوى تعبئة جديد
+                  إضافة مستوى تعبئة جديد (شكارة / كرتونة / باكت)
                 </Button>
               )}
             </CardContent>
@@ -449,16 +532,16 @@ export default function EditItemPage() {
               </div>
 
               {manageInventory && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-2">
-                    <Label className="text-slate-900 dark:text-white font-bold text-sm">المخزون الحالي (بـ {units[0]?.unit_name || 'كيلو جرام'})</Label>
+                    <Label className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">المخزون الحالي (بـ {units[0]?.unit_name || 'كيلو جرام'})</Label>
                     <Input type="number" disabled value={currentStock} className="h-12 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-mono font-black" />
                     <span className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">لتعديل المخزون الحالي، استخدم عمليات الشراء أو الجرد</span>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-slate-900 dark:text-white font-bold text-sm">تنبيه نقص المخزون</Label>
+                    <Label className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">تنبيه نقص المخزون</Label>
                     <Input 
-                      type="text"
+                      type="text" 
                       inputMode="numeric"
                       value={lowStockAlert} 
                       onKeyDown={(e) => {
@@ -489,13 +572,13 @@ export default function EditItemPage() {
             </CardHeader>
             <CardContent className="space-y-4 pt-6">
               <div className="space-y-2">
-                <Label htmlFor="buyPrice" className="text-slate-900 dark:text-white font-bold text-sm">
+                <Label htmlFor="buyPrice" className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">
                   {allowDecimal ? 'سعر شراء الكيلو (التكلفة)' : 'سعر الشراء (التكلفة)'}
                 </Label>
                 <div className="relative">
                   <Input 
                     id="buyPrice" 
-                    type="text"
+                    type="text" 
                     inputMode="decimal"
                     value={buyPrice} 
                     onKeyDown={(e) => {
@@ -513,13 +596,13 @@ export default function EditItemPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="sellPrice" className="text-slate-900 dark:text-white font-bold text-sm">
+                <Label htmlFor="sellPrice" className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">
                   {allowDecimal ? 'سعر بيع الكيلو الافتراضي *' : 'سعر البيع الافتراضي *'}
                 </Label>
                 <div className="relative">
                   <Input 
                     id="sellPrice" 
-                    type="text"
+                    type="text" 
                     inputMode="decimal"
                     value={sellPrice} 
                     onKeyDown={(e) => {
@@ -537,11 +620,11 @@ export default function EditItemPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="minSellPrice" className="text-slate-900 dark:text-white font-bold text-sm">أقل سعر للبيع (اختياري)</Label>
+                <Label htmlFor="minSellPrice" className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">أقل سعر للبيع (اختياري)</Label>
                 <div className="relative">
                   <Input 
                     id="minSellPrice" 
-                    type="text"
+                    type="text" 
                     inputMode="decimal"
                     value={minSellPrice} 
                     onKeyDown={(e) => {
@@ -568,9 +651,9 @@ export default function EditItemPage() {
             <CardContent className="space-y-4 pt-6">
               {barcodes.map((b, index) => (
                 <div key={index} className="flex items-center gap-2">
-                  <Input
-                    placeholder="امسح أو اكتب الباركود..."
-                    value={b.barcode}
+                  <Input 
+                    placeholder="امسح أو اكتب الباركود..." 
+                    value={b.barcode} 
                     onChange={e => {
                       const newBarcodes = [...barcodes]; newBarcodes[index].barcode = e.target.value; setBarcodes(newBarcodes)
                     }}
@@ -578,13 +661,13 @@ export default function EditItemPage() {
                     dir="ltr"
                   />
                   {index > 0 && (
-                    <Button variant="ghost" size="icon" className="shrink-0 text-rose-500 hover:text-rose-600" onClick={() => removeBarcode(index)}>
+                    <Button variant="ghost" size="icon" className="shrink-0 text-rose-500 hover:text-rose-600 cursor-pointer" onClick={() => removeBarcode(index)}>
                       <Trash2 className="h-5 w-5" />
                     </Button>
                   )}
                 </div>
               ))}
-              <Button type="button" variant="outline" onClick={addBarcode} className="w-full h-12 border-slate-300 dark:border-slate-700 font-bold">
+              <Button type="button" variant="outline" onClick={addBarcode} className="w-full h-12 border-slate-300 dark:border-slate-700 font-bold cursor-pointer">
                 <Plus className="ml-2 h-4 w-4" />
                 إضافة باركود آخر
               </Button>
@@ -593,15 +676,15 @@ export default function EditItemPage() {
         </div>
       </div>
 
-      {/* Fixed bottom action bar */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 shadow-2xl z-30 flex justify-end gap-4 px-6 sm:px-12">
-        <Button variant="outline" size="lg" className="h-14 px-8 text-base font-bold border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer" onClick={() => router.push('/dashboard/items')} disabled={isSubmitting}>
+      {/* Clean In-Flow Bottom Action Bar (No giant blocking footer) */}
+      <div className="flex items-center justify-end gap-3 pt-6 border-t border-slate-200 dark:border-slate-800">
+        <Button variant="outline" size="lg" className="h-12 px-6 text-sm font-bold border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer" onClick={() => router.push('/dashboard/items')} disabled={isSubmitting}>
           إلغاء
         </Button>
-        <Button size="lg" className="h-14 px-12 text-base font-black bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/30 active:scale-95 transition-all cursor-pointer" onClick={handleUpdate} disabled={isSubmitting}>
+        <Button size="lg" className="h-12 px-8 text-sm font-black bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-600/25 active:scale-95 transition-all cursor-pointer" onClick={handleUpdate} disabled={isSubmitting}>
           {isSubmitting ? 'جاري الحفظ...' : (
             <>
-              <Save className="ml-2 h-5 w-5" />
+              <Save className="ml-2 h-4 w-4" />
               حفظ التعديلات
             </>
           )}

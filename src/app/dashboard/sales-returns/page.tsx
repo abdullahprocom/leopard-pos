@@ -161,6 +161,15 @@ export default function SalesReturnsPage() {
               quantity: stock.quantity + line.return_qty,
               updated_at: now,
             })
+          } else {
+            await db.stock_balances.add({
+              id: crypto.randomUUID(),
+              store_id: storeId,
+              item_id: line.item_id,
+              branch_id: branchId,
+              quantity: line.return_qty,
+              updated_at: now
+            })
           }
 
           // Stock ledger entry
@@ -267,6 +276,15 @@ export default function SalesReturnsPage() {
             await db.stock_balances.where({ store_id: storeId, item_id: item.item_id, branch_id: branchId }).modify({
               quantity: stock.quantity + item.return_qty,
               updated_at: now,
+            })
+          } else {
+            await db.stock_balances.add({
+              id: crypto.randomUUID(),
+              store_id: storeId,
+              item_id: item.item_id,
+              branch_id: branchId,
+              quantity: item.return_qty,
+              updated_at: now
             })
           }
 

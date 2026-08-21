@@ -184,4 +184,39 @@ export function getDeviceId(): string {
   return deviceId
 }
 
+// Seed default supermarket categories if none exist
+export async function ensureDefaultCategories(storeId: string = '00000000-0000-0000-0000-000000000001') {
+  try {
+    const count = await db.categories.count()
+    if (count === 0) {
+      const defaultCategories = [
+        'أجبان ومنتجات ألبان',
+        'بقوليات وحبوب (أرز، سكر، دقيق)',
+        'مكرونات وصلصات',
+        'زيوت وسمن',
+        'معلبات وتونة',
+        'لحوم ومجمدات',
+        'خضروات وفواكه',
+        'عطارة وتوابل ومكسرات',
+        'مشروبات وعصائر ومياه',
+        'شيبسي وبسكويت وحلويات',
+        'منظفات ومستلزمات منزلية'
+      ]
+
+      const now = new Date().toISOString()
+      for (let i = 0; i < defaultCategories.length; i++) {
+        await db.categories.add({
+          id: crypto.randomUUID(),
+          store_id: storeId,
+          name: defaultCategories[i],
+          sort_order: i + 1,
+          created_at: now
+        })
+      }
+    }
+  } catch (err) {
+    console.warn('Error ensuring default categories:', err)
+  }
+}
+
 export type { SyncQueueEntry, LocalCart, StocktakingLocal, StocktakingLineLocal, StockTransferLocal, StockTransferLineLocal }
