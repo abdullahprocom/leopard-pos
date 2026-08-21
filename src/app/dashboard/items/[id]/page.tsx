@@ -398,9 +398,24 @@ export default function EditItemPage() {
                   {index > 0 && (
                     <div className="flex-1 space-y-2">
                       <Label className="text-slate-900 dark:text-white font-bold text-sm">يحتوي على كم {units[index - 1].unit_name || 'وحدة أصغر'}؟</Label>
-                      <Input type="number" min="1" step="1" value={unit.qty_in_parent} onChange={e => {
-                        const newUnits = [...units]; newUnits[index].qty_in_parent = Math.max(1, Math.floor(Math.abs(Number(e.target.value) || 1))); setUnits(newUnits)
-                      }} className="h-12 bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 font-mono font-bold" />
+                      <Input 
+                        type="text" 
+                        inputMode="numeric"
+                        value={unit.qty_in_parent} 
+                        onKeyDown={(e) => {
+                          if (e.key === '-' || e.key === 'e' || e.key === '+' || e.key === 'Subtract' || e.key === '.') {
+                            e.preventDefault()
+                          }
+                        }}
+                        onChange={e => {
+                          const sanitized = e.target.value.replace(/[^0-9]/g, '')
+                          const cleanVal = sanitized === '' ? 1 : Math.max(1, parseInt(sanitized, 10) || 1)
+                          const newUnits = [...units]
+                          newUnits[index].qty_in_parent = cleanVal
+                          setUnits(newUnits)
+                        }} 
+                        className="h-12 bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 font-mono font-bold" 
+                      />
                     </div>
                   )}
                   <div className="flex-1 space-y-2">
@@ -442,7 +457,21 @@ export default function EditItemPage() {
                   </div>
                   <div className="space-y-2">
                     <Label className="text-slate-900 dark:text-white font-bold text-sm">تنبيه نقص المخزون</Label>
-                    <Input type="number" min="0" step="1" value={lowStockAlert} onChange={e => setLowStockAlert(e.target.value)} className="h-12 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 font-mono font-bold" />
+                    <Input 
+                      type="text"
+                      inputMode="numeric"
+                      value={lowStockAlert} 
+                      onKeyDown={(e) => {
+                        if (e.key === '-' || e.key === 'e' || e.key === '+' || e.key === 'Subtract') {
+                          e.preventDefault()
+                        }
+                      }}
+                      onChange={e => {
+                        const clean = e.target.value.replace(/[^0-9]/g, '')
+                        setLowStockAlert(clean === '' ? '0' : clean)
+                      }} 
+                      className="h-12 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 font-mono font-bold" 
+                    />
                   </div>
                 </div>
               )}
@@ -464,7 +493,22 @@ export default function EditItemPage() {
                   {allowDecimal ? 'سعر شراء الكيلو (التكلفة)' : 'سعر الشراء (التكلفة)'}
                 </Label>
                 <div className="relative">
-                  <Input id="buyPrice" type="number" step="0.01" min="0" value={buyPrice} onChange={e => setBuyPrice(Math.max(0, parseFloat(e.target.value) || 0).toString())} className="h-12 pl-12 text-lg font-mono font-bold bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700" />
+                  <Input 
+                    id="buyPrice" 
+                    type="text"
+                    inputMode="decimal"
+                    value={buyPrice} 
+                    onKeyDown={(e) => {
+                      if (e.key === '-' || e.key === 'e' || e.key === '+' || e.key === 'Subtract') {
+                        e.preventDefault()
+                      }
+                    }}
+                    onChange={e => {
+                      const clean = e.target.value.replace(/[^0-9.]/g, '')
+                      setBuyPrice(clean)
+                    }} 
+                    className="h-12 pl-12 text-lg font-mono font-bold bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700" 
+                  />
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">ج.م</span>
                 </div>
               </div>
@@ -473,14 +517,44 @@ export default function EditItemPage() {
                   {allowDecimal ? 'سعر بيع الكيلو الافتراضي *' : 'سعر البيع الافتراضي *'}
                 </Label>
                 <div className="relative">
-                  <Input id="sellPrice" type="number" step="0.01" min="0" value={sellPrice} onChange={e => setSellPrice(Math.max(0, parseFloat(e.target.value) || 0).toString())} className="h-12 pl-12 text-lg font-black text-blue-600 dark:text-blue-400 font-mono bg-slate-50 dark:bg-slate-900 border-blue-500/40" />
+                  <Input 
+                    id="sellPrice" 
+                    type="text"
+                    inputMode="decimal"
+                    value={sellPrice} 
+                    onKeyDown={(e) => {
+                      if (e.key === '-' || e.key === 'e' || e.key === '+' || e.key === 'Subtract') {
+                        e.preventDefault()
+                      }
+                    }}
+                    onChange={e => {
+                      const clean = e.target.value.replace(/[^0-9.]/g, '')
+                      setSellPrice(clean)
+                    }} 
+                    className="h-12 pl-12 text-lg font-black text-blue-600 dark:text-blue-400 font-mono bg-slate-50 dark:bg-slate-900 border-blue-500/40" 
+                  />
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">ج.م</span>
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="minSellPrice" className="text-slate-900 dark:text-white font-bold text-sm">أقل سعر للبيع (اختياري)</Label>
                 <div className="relative">
-                  <Input id="minSellPrice" type="number" step="0.01" min="0" value={minSellPrice} onChange={e => setMinSellPrice(Math.max(0, parseFloat(e.target.value) || 0).toString())} className="h-12 pl-12 font-mono font-bold bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700" />
+                  <Input 
+                    id="minSellPrice" 
+                    type="text"
+                    inputMode="decimal"
+                    value={minSellPrice} 
+                    onKeyDown={(e) => {
+                      if (e.key === '-' || e.key === 'e' || e.key === '+' || e.key === 'Subtract') {
+                        e.preventDefault()
+                      }
+                    }}
+                    onChange={e => {
+                      const clean = e.target.value.replace(/[^0-9.]/g, '')
+                      setMinSellPrice(clean)
+                    }} 
+                    className="h-12 pl-12 font-mono font-bold bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700" 
+                  />
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">ج.م</span>
                 </div>
               </div>
