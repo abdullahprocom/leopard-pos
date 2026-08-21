@@ -69,12 +69,15 @@ export default function NewItemPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Fetch categories & ensure defaults
+  // Fetch categories & ensure defaults strictly isolated per store and business activity
   useEffect(() => {
-    ensureDefaultCategories(DEFAULT_STORE_UUID)
-  }, [])
+    ensureDefaultCategories(DEFAULT_STORE_UUID, businessType)
+  }, [businessType])
 
-  const categories = useLiveQuery(() => db.categories.toArray(), []) || []
+  const categories = useLiveQuery(
+    () => db.categories.where('store_id').equals(DEFAULT_STORE_UUID).sortBy('sort_order'),
+    [businessType]
+  ) || []
 
   // Dynamic Suggestion Chips for Unit of Measure based on profile
   const unitSuggestions = isSupermarket 

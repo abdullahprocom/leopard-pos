@@ -44,10 +44,21 @@ export default function POSPage() {
 
   const searchInputRef = useRef<HTMLInputElement>(null)
 
-  // Live queries for quick product touch grid & customers
-  const allItems = useLiveQuery(() => db.items.filter(i => i.status === 'active').toArray()) || []
-  const allCategories = useLiveQuery(() => db.categories.toArray()) || []
-  const allCustomers = useLiveQuery(() => db.customers.toArray()) || []
+  const currentStoreId = storeId || DEFAULT_STORE_UUID
+
+  // Live queries strictly isolated by current store
+  const allItems = useLiveQuery(
+    () => db.items.where('store_id').equals(currentStoreId).filter(i => i.status === 'active').toArray(),
+    [currentStoreId]
+  ) || []
+  const allCategories = useLiveQuery(
+    () => db.categories.where('store_id').equals(currentStoreId).sortBy('sort_order'),
+    [currentStoreId]
+  ) || []
+  const allCustomers = useLiveQuery(
+    () => db.customers.where('store_id').equals(currentStoreId).toArray(),
+    [currentStoreId]
+  ) || []
 
   // Filter items for quick grid
   const quickItems = useMemo(() => {

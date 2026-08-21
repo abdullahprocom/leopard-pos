@@ -10,14 +10,19 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { ThermalReceipt } from '../pos/receipt'
 
+import { useStore } from '@/lib/store-context'
+import { DEFAULT_STORE_UUID } from '@/lib/sync-engine'
+
 export default function SalesListPage() {
+  const { storeId } = useStore()
+  const currentStoreId = storeId || DEFAULT_STORE_UUID
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedSale, setSelectedSale] = useState<any>(null)
 
-  // Fetch sales and sale lines
+  // Fetch sales and sale lines strictly for current store
   const salesData = useLiveQuery(async () => {
-    const salesList = await db.sales.orderBy('created_at').reverse().toArray()
-    const allLines = await db.sale_lines.toArray()
+    const salesList = await db.sales.where('store_id').equals(currentStoreId).reverse().sortBy('created_at')
+    const allLines = await db.sale_lines.where('store_id').equals(currentStoreId).toArray()
 
     // Map lines to their sales
     const linesBySaleId = new Map<string, typeof allLines>()
@@ -32,7 +37,7 @@ export default function SalesListPage() {
       ...sale,
       lines: linesBySaleId.get(sale.id) || []
     }))
-  }, []) || []
+  }, [currentStoreId]) || []
 
   const filteredSales = salesData.filter(s =>
     s.invoice_number.toLowerCase().includes(searchTerm.toLowerCase()) ||

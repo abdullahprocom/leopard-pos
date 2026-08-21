@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/lib/db'
+import { useStore } from '@/lib/store-context'
+import { DEFAULT_STORE_UUID } from '@/lib/sync-engine'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -12,16 +14,20 @@ import { Plus, Search, Package, PackageSearch, Tag, ArrowUpRight } from 'lucide-
 
 export default function ItemsPage() {
   const router = useRouter()
+  const { storeId } = useStore()
+  const currentStoreId = storeId || DEFAULT_STORE_UUID
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
 
-  // Fetch categories for filter
-  const categories = useLiveQuery(() => db.categories.toArray(), []) || []
+  // Fetch categories strictly for current store
+  const categories = useLiveQuery(
+    () => db.categories.where('store_id').equals(currentStoreId).sortBy('sort_order'),
+    [currentStoreId]
+  ) || []
 
-  // Fetch items and stock balances
+  // Fetch items and stock balances strictly for current store
   const itemsData = useLiveQuery(async () => {
-    let itemsQuery = db.items.toCollection()
-    let items = await itemsQuery.sortBy('created_at')
+    let items = await db.items.where('store_id').equals(currentStoreId).sortBy('created_at')
     
     // Filter by search query
     if (searchQuery) {
@@ -34,15 +40,15 @@ export default function ItemsPage() {
       items = items.filter(item => item.category_id === selectedCategory)
     }
 
-    // Fetch stock balances for these items
-    const stockBalances = await db.stock_balances.toArray()
+    // Fetch stock balances strictly for this store
+    const stockBalances = await db.stock_balances.where('store_id').equals(currentStoreId).toArray()
     const stockMap = new Map<string, number>()
     stockBalances.forEach(sb => {
       stockMap.set(sb.item_id, (stockMap.get(sb.item_id) || 0) + sb.quantity)
     })
 
     // Fetch barcodes for display
-    const allBarcodes = await db.item_barcodes.toArray()
+    const allBarcodes = await db.item_barcodes.where('store_id').equals(currentStoreId).toArray()
     const barcodeMap = new Map<string, string[]>()
     allBarcodes.forEach(b => {
       if (!barcodeMap.has(b.item_id)) {

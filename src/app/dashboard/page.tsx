@@ -4,6 +4,8 @@ import { useMemo } from 'react'
 import Link from 'next/link'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/lib/db'
+import { useStore } from '@/lib/store-context'
+import { DEFAULT_STORE_UUID } from '@/lib/sync-engine'
 import { money, formatCurrency, formatNumber } from '@/lib/finance'
 import {
   ShoppingCart,
@@ -142,13 +144,16 @@ const groups: TileGroup[] = [
 ]
 
 export default function DashboardPage() {
-  // ─── Live Queries ───
-  const sales = useLiveQuery(() => db.sales.toArray()) || []
-  const saleLines = useLiveQuery(() => db.sale_lines.toArray()) || []
-  const salesReturns = useLiveQuery(() => db.sales_returns.toArray()) || []
-  const purchases = useLiveQuery(() => db.purchases.toArray()) || []
-  const items = useLiveQuery(() => db.items.toArray()) || []
-  const stockBalances = useLiveQuery(() => db.stock_balances.toArray()) || []
+  const { storeId } = useStore()
+  const currentStoreId = storeId || DEFAULT_STORE_UUID
+
+  // ─── Live Queries strictly isolated by current store (Tenant Isolation) ───
+  const sales = useLiveQuery(() => db.sales.where('store_id').equals(currentStoreId).toArray(), [currentStoreId]) || []
+  const saleLines = useLiveQuery(() => db.sale_lines.where('store_id').equals(currentStoreId).toArray(), [currentStoreId]) || []
+  const salesReturns = useLiveQuery(() => db.sales_returns.where('store_id').equals(currentStoreId).toArray(), [currentStoreId]) || []
+  const purchases = useLiveQuery(() => db.purchases.where('store_id').equals(currentStoreId).toArray(), [currentStoreId]) || []
+  const items = useLiveQuery(() => db.items.where('store_id').equals(currentStoreId).toArray(), [currentStoreId]) || []
+  const stockBalances = useLiveQuery(() => db.stock_balances.where('store_id').equals(currentStoreId).toArray(), [currentStoreId]) || []
 
   // ─── Computed KPIs ───
   const kpis = useMemo(() => {

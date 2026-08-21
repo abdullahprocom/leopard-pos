@@ -74,12 +74,15 @@ export default function EditItemPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Fetch categories & ensure defaults
+  // Fetch categories & ensure defaults strictly isolated per store and business activity
   useEffect(() => {
-    ensureDefaultCategories(DEFAULT_STORE_UUID)
-  }, [])
+    ensureDefaultCategories(DEFAULT_STORE_UUID, businessType)
+  }, [businessType])
 
-  const categories = useLiveQuery(() => db.categories.toArray(), []) || []
+  const categories = useLiveQuery(
+    () => db.categories.where('store_id').equals(DEFAULT_STORE_UUID).sortBy('sort_order'),
+    [businessType]
+  ) || []
 
   // Fetch price history audit log for this item
   const priceHistoryList = useLiveQuery(async () => {

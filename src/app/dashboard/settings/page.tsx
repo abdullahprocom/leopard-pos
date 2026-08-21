@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 export default function SettingsPage() {
-  const { storeName, setStoreName, businessType, setBusinessType, activationToken, activateOfflineSystem, isActivated } = useStore()
+  const { storeName, setStoreName, businessType, setBusinessType, purgeAndReseedCategories, activationToken, activateOfflineSystem, isActivated } = useStore()
   const [localStoreName, setLocalStoreName] = useState(storeName)
   const [localBusinessType, setLocalBusinessType] = useState<BusinessType>(businessType)
   const [currency, setCurrency] = useState('EGP')
@@ -169,12 +169,26 @@ export default function SettingsPage() {
                 <span>✅ <strong>ملف التجارة العامة مفعل:</strong> نظام محاسبي نقي للأصناف والقطع وإدارة المشتريات والمبيعات والمخازن.</span>
               )}
               {localBusinessType === 'pharmacy' && (
-                <span>💊 <strong>ملف الصيدليات مفعل:</strong> إظهار الاسم العلمي، المادة الفعالة، والتشغيلات وتواريخ الصلاحية.</span>
+                <span>💊 <strong>ملف الصيدليات مفعل:</strong> إظهار الاسم العلمي، المادة الفعالة، والتشغيلات وتواريخ الصلاحية وتصنيفات الأدوية.</span>
               )}
               {localBusinessType === 'clothing' && (
-                <span>👕 <strong>ملف الملابس مفعل:</strong> دعم جدول المقاسات والألوان والباركود المتعدد.</span>
+                <span>👕 <strong>ملف الملابس مفعل:</strong> دعم جدول المقاسات والألوان والباركود المتعدد وتصنيفات الموضة.</span>
               )}
             </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                await purgeAndReseedCategories(localBusinessType)
+                toast.success(`تم تطهير وإعادة تهيئة تصنيفات (${localBusinessType}) بنجاح`)
+              }}
+              className="w-full h-11 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 font-bold text-xs hover:bg-blue-50 dark:hover:bg-blue-950/40 cursor-pointer"
+            >
+              <RefreshCw className="w-4 h-4 ml-2 text-blue-600" />
+              تطهير وإعادة تهيئة التصنيفات الافتراضية للنشاط المختار
+            </Button>
           </CardContent>
         </Card>
 

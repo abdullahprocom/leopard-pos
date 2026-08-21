@@ -3,7 +3,7 @@
 
 import Dexie, { type EntityTable } from 'dexie'
 import type {
-  Store, Branch, Category, Item, ItemBarcode, ItemUnit, ItemPriceHistory,
+  Store, Branch, Category, Item, ItemBarcode, ItemUnit, ItemPriceHistory, BusinessType,
   StockBalance, StockLedgerEntry, Supplier, Purchase, PurchaseLine,
   PurchaseReturn, PurchaseReturnLine, Customer, Sale, SaleLine, SalesReturn, SalesReturnLine,
   CashTransaction, CashierShift, Employee, Role, RolePermission,
@@ -186,26 +186,81 @@ export function getDeviceId(): string {
   return deviceId
 }
 
-// Seed default supermarket categories if none exist
-export async function ensureDefaultCategories(storeId: string = '00000000-0000-0000-0000-000000000001') {
-  try {
-    const count = await db.categories.count()
-    if (count === 0) {
-      const defaultCategories = [
-        'أجبان ومنتجات ألبان',
-        'بقوليات وحبوب (أرز، سكر، دقيق)',
-        'مكرونات وصلصات',
-        'زيوت وسمن',
-        'معلبات وتونة',
-        'لحوم ومجمدات',
-        'خضروات وفواكه',
-        'عطارة وتوابل ومكسرات',
-        'مشروبات وعصائر ومياه',
-        'شيبسي وبسكويت وحلويات',
-        'منظفات ومستلزمات منزلية'
-      ]
+// Default categories mapped strictly per business profile
+export const DEFAULT_BUSINESS_CATEGORIES: Record<BusinessType, string[]> = {
+  pharmacy: [
+    'أدوية ومسكنات',
+    'مضادات حيوية',
+    'فيتامينات ومكملات غذائية',
+    'مستحضرات تجميل وعناية بالبشرة',
+    'عناية شخصية وصحة عامة',
+    'مستلزمات طبية وإسعافات أولية',
+    'أدوية أطفال ورضع',
+    'عناية بالفم والأسنان'
+  ],
+  supermarket: [
+    'أجبان ومنتجات ألبان',
+    'بقوليات وحبوب (أرز، سكر، دقيق)',
+    'مكرونات وصلصات',
+    'زيوت وسمن',
+    'معلبات وتونة',
+    'لحوم ومجمدات',
+    'خضروات وفواكه',
+    'عطارة وتوابل ومكسرات',
+    'مشروبات وعصائر ومياه',
+    'شيبسي وبسكويت وحلويات',
+    'منظفات ومستلزمات منزلية'
+  ],
+  clothing: [
+    'ملابس رجالي',
+    'ملابس حريمي',
+    'ملابس أطفال',
+    'أحذية رياضية وكلاسيك',
+    'إكسسوارات وحقائب',
+    'شنط ومحافظ',
+    'لانجري وملابس نوم'
+  ],
+  restaurant: [
+    'وجبات رئيسية',
+    'ساندوتشات ووجبات سريعة',
+    'مقبلات وسلطات',
+    'مشروبات وعصائر باردة',
+    'مشروبات ساخنة',
+    'حلويات وديزرت'
+  ],
+  general: [
+    'أصناف عامة',
+    'أدوات ومستلزمات',
+    'أجهزة ومعدات',
+    'قطع غيار',
+    'مواد خام ومهمات'
+  ]
+}
 
+// Dynamic Contextual Seeding per Business Type & Tenant Isolation
+export async function ensureDefaultCategories(
+  storeId: string = '00000000-0000-0000-0000-000000000001',
+  businessType: BusinessType = 'supermarket',
+  forceReset: boolean = false
+) {
+  try {
+    const existing = await db.categories.where('store_id').equals(storeId).toArray()
+
+    // Check if existing categories mismatch the current business activity
+    // (e.g. store is pharmacy but categories are supermarket cheeses/groceries)
+    const isPharmaMismatch = businessType === 'pharmacy' && existing.some(c => c.name.includes('أجبان') || c.name.includes('خضروات') || c.name.includes('معلبات'))
+    const isClothingMismatch = businessType === 'clothing' && existing.some(c => c.name.includes('أجبان') || c.name.includes('أدوية'))
+    const isSupermarketMismatch = businessType === 'supermarket' && existing.some(c => c.name.includes('أدوية') || c.name.includes('ملابس رجالي'))
+
+    const shouldPurgeAndReSeed = forceReset || existing.length === 0 || isPharmaMismatch || isClothingMismatch || isSupermarketMismatch
+
+    if (shouldPurgeAndReSeed) {
+      // Purge old mismatched categories for this store
+      await db.categories.where('store_id').equals(storeId).delete()
+
+      const defaultCategories = DEFAULT_BUSINESS_CATEGORIES[businessType] || DEFAULT_BUSINESS_CATEGORIES.supermarket
       const now = new Date().toISOString()
+
       for (let i = 0; i < defaultCategories.length; i++) {
         await db.categories.add({
           id: crypto.randomUUID(),

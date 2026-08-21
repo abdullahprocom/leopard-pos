@@ -36,18 +36,23 @@ import {
   Legend
 } from 'recharts'
 
+import { useStore } from '@/lib/store-context'
+import { DEFAULT_STORE_UUID } from '@/lib/sync-engine'
+
 export default function ReportsPage() {
+  const { storeId } = useStore()
+  const currentStoreId = storeId || DEFAULT_STORE_UUID
   const [period, setPeriod] = useState<'today' | 'week' | 'month' | 'all'>('today')
 
-  // Live queries
-  const sales = useLiveQuery(() => db.sales.toArray()) || []
-  const saleLines = useLiveQuery(() => db.sale_lines.toArray()) || []
-  const salesReturns = useLiveQuery(() => db.sales_returns.toArray()) || []
-  const returnLines = useLiveQuery(() => db.sales_return_lines.toArray()) || []
-  const purchases = useLiveQuery(() => db.purchases.toArray()) || []
-  const items = useLiveQuery(() => db.items.toArray()) || []
-  const categories = useLiveQuery(() => db.categories.toArray()) || []
-  const stockBalances = useLiveQuery(() => db.stock_balances.toArray()) || []
+  // Live queries strictly isolated by current store (Tenant Isolation)
+  const sales = useLiveQuery(() => db.sales.where('store_id').equals(currentStoreId).toArray(), [currentStoreId]) || []
+  const saleLines = useLiveQuery(() => db.sale_lines.where('store_id').equals(currentStoreId).toArray(), [currentStoreId]) || []
+  const salesReturns = useLiveQuery(() => db.sales_returns.where('store_id').equals(currentStoreId).toArray(), [currentStoreId]) || []
+  const returnLines = useLiveQuery(() => db.sales_return_lines.where('store_id').equals(currentStoreId).toArray(), [currentStoreId]) || []
+  const purchases = useLiveQuery(() => db.purchases.where('store_id').equals(currentStoreId).toArray(), [currentStoreId]) || []
+  const items = useLiveQuery(() => db.items.where('store_id').equals(currentStoreId).toArray(), [currentStoreId]) || []
+  const categories = useLiveQuery(() => db.categories.where('store_id').equals(currentStoreId).toArray(), [currentStoreId]) || []
+  const stockBalances = useLiveQuery(() => db.stock_balances.where('store_id').equals(currentStoreId).toArray(), [currentStoreId]) || []
 
   // Filter date predicate
   const filteredSales = useMemo(() => {

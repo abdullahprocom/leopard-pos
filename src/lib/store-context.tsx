@@ -19,6 +19,7 @@ interface StoreContextType {
   setUserId: (id: string | null) => void
   setStoreName: (name: string) => void
   setBusinessType: (type: BusinessType) => void
+  purgeAndReseedCategories: (type?: BusinessType) => Promise<void>
   activateOfflineSystem: (token: string, name?: string, type?: BusinessType) => void
   // Convenient profile helpers
   isPharma: boolean
@@ -71,10 +72,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setActivationToken(devToken)
         setIsActivated(true)
       }
-    }
 
-    // 3. Ensure default categories
-    ensureDefaultCategories(DEFAULT_STORE_UUID)
+      // 3. Ensure default categories for the loaded business profile
+      const currentType = savedType || 'supermarket'
+      ensureDefaultCategories(DEFAULT_STORE_UUID, currentType)
+    }
 
     return () => {
       window.removeEventListener('online', handleOnline)
@@ -82,11 +84,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const setBusinessType = (type: BusinessType) => {
+  const setBusinessType = async (type: BusinessType) => {
     setBusinessTypeState(type)
     if (typeof window !== 'undefined') {
       localStorage.setItem('erp_business_type', type)
     }
+    // Automatically purge mismatched categories and re-seed with the new profile
+    await ensureDefaultCategories(storeId || DEFAULT_STORE_UUID, type, true)
+  }
+
+  const purgeAndReseedCategories = async (type?: BusinessType) => {
+    const targetType = type || businessType
+    await ensureDefaultCategories(storeId || DEFAULT_STORE_UUID, targetType, true)
   }
 
   const setStoreName = (name: string) => {
@@ -108,6 +117,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (type) {
         setBusinessTypeState(type)
         localStorage.setItem('erp_business_type', type)
+        ensureDefaultCategories(storeId || DEFAULT_STORE_UUID, type, true)
       }
     }
   }
@@ -128,6 +138,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setUserId,
         setStoreName,
         setBusinessType,
+        purgeAndReseedCategories,
         activateOfflineSystem,
         isPharma: businessType === 'pharmacy',
         isSupermarket: businessType === 'supermarket' || businessType === 'general',
