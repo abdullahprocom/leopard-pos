@@ -83,12 +83,20 @@ export default function POSPage() {
     if (e.key === 'Enter' && searchTerm.trim()) {
       e.preventDefault()
       const query = searchTerm.trim().toLowerCase()
+      let item: any = null
+      let matchedUnitName: string | undefined = undefined
+      let matchedMultiplier: number = 1
+      let matchedPrice: number | undefined = undefined
 
-      // 1. Look up by barcode in item_barcodes
+      // 1. Search in item_barcodes (finds both main barcodes and unit-specific packaging barcodes)
       const barcodeRecord = await db.item_barcodes.where('barcode').equals(query).first()
-      let item = null
       if (barcodeRecord) {
         item = await db.items.get(barcodeRecord.item_id)
+        if (barcodeRecord.conversion_factor && barcodeRecord.conversion_factor > 1) {
+          matchedMultiplier = barcodeRecord.conversion_factor
+          matchedUnitName = barcodeRecord.unit_name
+          matchedPrice = barcodeRecord.price_override
+        }
       }
 
       // 2. Or search by SKU or name
@@ -100,7 +108,12 @@ export default function POSPage() {
       }
 
       if (item) {
-        handleItemClick(item)
+        if (matchedMultiplier > 1) {
+          // Unit packaging barcode scanned (e.g. Carton or Pack)
+          addToCart(item, matchedMultiplier, matchedUnitName, matchedPrice)
+        } else {
+          handleItemClick(item)
+        }
         setSearchTerm('')
       } else {
         toast.error('لم يتم العثور على الصنف - تأكد من قراءة الباركود أو كتابة الاسم بشكل صحيح')
@@ -118,8 +131,10 @@ export default function POSPage() {
     }
   }
 
-  const addToCart = (item: any, quantity: number = 1) => {
-    const price = cleanPositivePrice(item.sell_price || item.unit_price || 0)
+  const addToCart = (item: any, quantity: number = 1, unitLabel?: string, overridePrice?: number) => {
+    const price = overridePrice !== undefined && overridePrice > 0 
+      ? overridePrice 
+      : cleanPositivePrice(item.sell_price || item.unit_price || 0)
     const allowDec = Boolean(item.allow_decimal)
     const validQty = cleanPositiveQuantity(quantity, allowDec)
 
@@ -138,7 +153,7 @@ export default function POSPage() {
       return [...prev, {
         id: crypto.randomUUID(),
         item_id: item.id,
-        name: item.name,
+        name: unitLabel ? `${item.name} (${unitLabel})` : item.name,
         quantity: validQty,
         unit_price: price,
         discount: 0,
@@ -146,7 +161,8 @@ export default function POSPage() {
         allow_decimal: allowDec
       }]
     })
-    toast.success(`تمت إضافة: ${item.name} (${validQty} ${allowDec ? 'كجم' : 'قطعة'})`, { duration: 1200 })
+    const displayName = unitLabel ? `${item.name} [عبوة: ${unitLabel}]` : item.name
+    toast.success(`تمت إضافة: ${displayName} (${validQty} ${allowDec ? 'كجم' : (item.unit || 'وحدة')})`, { duration: 1500 })
   }
 
   const handleOpenScaleForCartItem = (cartItem: CartItem) => {

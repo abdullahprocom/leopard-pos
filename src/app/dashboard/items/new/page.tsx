@@ -12,10 +12,10 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { ArrowRight, Plus, Trash2, Save, Scale, Pill, Check, FolderPlus, X, Shirt, Sparkles, AlertCircle, Calendar, Hash } from 'lucide-react'
+import { ArrowRight, Plus, Trash2, Save, Scale, Pill, Check, FolderPlus, X, Shirt, Sparkles, AlertCircle, Calendar, Hash, Wand2, QrCode, History } from 'lucide-react'
 import { toast } from 'sonner'
-import type { ItemType, ItemStatus, BusinessType } from '@/lib/types'
-import { cleanPositiveQuantity, cleanPositivePrice, money } from '@/lib/finance'
+import type { ItemType, ItemStatus, BusinessType, ItemPriceHistory } from '@/lib/types'
+import { cleanPositiveQuantity, cleanPositivePrice, money, generateBarcode } from '@/lib/finance'
 
 export default function NewItemPage() {
   const router = useRouter()
@@ -249,17 +249,22 @@ export default function NewItemPage() {
           }
         }
 
-        // 4. Handle Dynamic Units of Measure (UOM)
+        // 4. Handle Dynamic Units of Measure (UOM) with cumulative conversion factors
+        let cumulativeConversion = 1
         let parentUnitName: string | undefined = undefined
         for (let i = 0; i < units.length; i++) {
           const u = units[i]
+          const qtyInParent = Math.max(1, Math.floor(Math.abs(Number(u.qty_in_parent) || 1)))
+          cumulativeConversion = i === 0 ? 1 : cumulativeConversion * qtyInParent
+          
           const itemUnit = {
             id: crypto.randomUUID(),
             store_id: storeId,
             item_id: itemId,
             level: u.level,
             unit_name: u.unit_name.trim() || (allowDecimal ? 'كيلو جرام' : 'قطعة'),
-            qty_in_parent: Math.max(1, Math.floor(Math.abs(Number(u.qty_in_parent) || 1))),
+            qty_in_parent: qtyInParent,
+            conversion_factor: cumulativeConversion,
             parent_unit: parentUnitName,
             barcode: u.barcode?.trim() || undefined,
             sell_price: u.sell_price ? cleanPositivePrice(u.sell_price) : undefined,
@@ -268,9 +273,41 @@ export default function NewItemPage() {
           await db.item_units.add(itemUnit)
           syncEngine.enqueueOperation('item_units', 'INSERT', itemUnit)
           parentUnitName = u.unit_name.trim()
+
+          // If unit has its own barcode, register in item_barcodes
+          if (u.barcode?.trim()) {
+            const unitBarcodeRecord = {
+              id: crypto.randomUUID(),
+              store_id: storeId,
+              item_id: itemId,
+              barcode: u.barcode.trim(),
+              is_primary: false,
+              unit_name: u.unit_name.trim(),
+              conversion_factor: cumulativeConversion,
+              price_override: u.sell_price ? cleanPositivePrice(u.sell_price) : undefined,
+              created_at: now
+            }
+            await db.item_barcodes.add(unitBarcodeRecord)
+            syncEngine.enqueueOperation('item_barcodes', 'INSERT', unitBarcodeRecord)
+          }
         }
 
-        // 5. Handle Opening Stock (in base unit)
+        // 5. Initial Price History Audit Record
+        const priceHistoryRecord = {
+          id: crypto.randomUUID(),
+          store_id: storeId,
+          item_id: itemId,
+          old_buy_price: 0,
+          new_buy_price: cleanBuy,
+          old_sell_price: 0,
+          new_sell_price: cleanSell,
+          change_reason: 'السعر الافتتاحي عند إضافة الصنف للكتالوج',
+          created_at: now
+        }
+        await db.item_price_history.add(priceHistoryRecord)
+        syncEngine.enqueueOperation('item_price_history', 'INSERT', priceHistoryRecord)
+
+        // 6. Handle Opening Stock (in base unit)
         const openStockVal = Math.max(0, Number(openingStock) || 0)
         const cleanOpening = allowDecimal ? cleanPositiveQuantity(openStockVal, true) : Math.floor(openStockVal)
 
@@ -627,9 +664,26 @@ export default function NewItemPage() {
                   )}
                   <div className="flex-1 space-y-2">
                     <Label className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">باركود خاص بالوحدة (اختياري)</Label>
-                    <Input value={unit.barcode} onChange={e => {
-                      const newUnits = [...units]; newUnits[index].barcode = e.target.value; setUnits(newUnits)
-                    }} className="h-12 font-mono bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 font-bold" dir="ltr" />
+                    <div className="flex items-center gap-1.5">
+                      <Input value={unit.barcode} onChange={e => {
+                        const newUnits = [...units]; newUnits[index].barcode = e.target.value; setUnits(newUnits)
+                      }} className="h-12 font-mono bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 font-bold" dir="ltr" placeholder="باركود العبوة..." />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        title="توليد باركود للوحدة"
+                        onClick={() => {
+                          const newUnits = [...units]
+                          newUnits[index].barcode = generateBarcode()
+                          setUnits(newUnits)
+                          toast.success(`تم توليد باركود لوحدة (${unit.unit_name}) بنجاح`)
+                        }}
+                        className="h-12 w-12 shrink-0 border-slate-300 dark:border-slate-700 hover:border-blue-500 hover:text-blue-600 cursor-pointer"
+                      >
+                        <Wand2 className="w-4 h-4 text-blue-600" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -797,8 +851,8 @@ export default function NewItemPage() {
           </Card>
 
           <Card className="border-slate-200/90 dark:border-slate-800 shadow-sm">
-            <CardHeader className="border-b border-slate-100 dark:border-slate-800/80 pb-4">
-              <CardTitle className="text-lg font-black text-slate-900 dark:text-white">الباركود الدولي</CardTitle>
+            <CardHeader className="border-b border-slate-100 dark:border-slate-800/80 pb-4 flex flex-row items-center justify-between">
+              <CardTitle className="text-lg font-black text-slate-900 dark:text-white">الباركود الدولي والتلقائي</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 pt-6">
               {barcodes.map((b, index) => (
@@ -812,6 +866,22 @@ export default function NewItemPage() {
                     className="h-12 font-mono font-bold bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700"
                     dir="ltr"
                   />
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    title="توليد باركود تلقائي مطابق للمواصفات الدولية EAN-13" 
+                    onClick={() => {
+                      const newBarcodes = [...barcodes]
+                      newBarcodes[index].barcode = generateBarcode()
+                      setBarcodes(newBarcodes)
+                      toast.success('تم توليد باركود تلقائي بنجاح')
+                    }}
+                    className="h-12 px-3 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:text-blue-600 hover:border-blue-500 cursor-pointer shrink-0 font-bold text-xs"
+                  >
+                    <Wand2 className="w-4 h-4 ml-1 text-blue-600" />
+                    توليد
+                  </Button>
                   {index > 0 && (
                     <Button variant="ghost" size="icon" className="shrink-0 text-rose-500 hover:text-rose-600 cursor-pointer" onClick={() => removeBarcode(index)}>
                       <Trash2 className="h-5 w-5" />

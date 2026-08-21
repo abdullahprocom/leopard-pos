@@ -3,7 +3,7 @@
 
 import Dexie, { type EntityTable } from 'dexie'
 import type {
-  Store, Branch, Category, Item, ItemBarcode, ItemUnit,
+  Store, Branch, Category, Item, ItemBarcode, ItemUnit, ItemPriceHistory,
   StockBalance, StockLedgerEntry, Supplier, Purchase, PurchaseLine,
   PurchaseReturn, PurchaseReturnLine, Customer, Sale, SaleLine, SalesReturn, SalesReturnLine,
   CashTransaction, CashierShift, Employee, Role, RolePermission,
@@ -84,6 +84,7 @@ class LeopardDatabase extends Dexie {
   items!: EntityTable<Item, 'id'>
   item_barcodes!: EntityTable<ItemBarcode, 'id'>
   item_units!: EntityTable<ItemUnit, 'id'>
+  item_price_history!: EntityTable<ItemPriceHistory, 'id'>
   stock_balances!: EntityTable<StockBalance, 'store_id'>
   stock_ledger!: EntityTable<StockLedgerEntry, 'id'>
 
@@ -121,16 +122,17 @@ class LeopardDatabase extends Dexie {
   constructor() {
     super('LeopardPOS')
 
-    this.version(2).stores({
+    this.version(3).stores({
       // Foundation
       stores: 'id, owner_id, created_at',
       branches: 'id, store_id, code, is_default, created_at',
 
-      // Inventory - key indexes for fast search
+      // Inventory - key indexes for fast search & hierarchy
       categories: 'id, store_id, name, parent_id, created_at',
       items: 'id, store_id, name, sku, category_id, status, search_text, created_at',
-      item_barcodes: 'id, store_id, item_id, barcode, created_at',
-      item_units: 'id, store_id, item_id, level',
+      item_barcodes: 'id, store_id, item_id, barcode, unit_name, created_at',
+      item_units: 'id, store_id, item_id, level, unit_name',
+      item_price_history: 'id, store_id, item_id, created_at',
       stock_balances: '[store_id+item_id+branch_id], store_id, item_id, branch_id',
       stock_ledger: 'id, store_id, item_id, branch_id, movement_type, created_at',
 

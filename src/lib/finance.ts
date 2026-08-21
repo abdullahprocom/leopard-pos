@@ -131,3 +131,16 @@ export function formatNumber(num: number, decimals = 0): string {
     maximumFractionDigits: decimals,
   }).format(positive(num))
 }
+
+/** Generate standard 13-digit EAN barcode with valid checksum */
+export function generateBarcode(prefix = '622'): string {
+  const randomPart = Math.floor(100000000 + Math.random() * 900000000).toString()
+  const raw12 = `${prefix}${randomPart}`.slice(0, 12)
+  let sum = 0
+  for (let i = 0; i < 12; i++) {
+    const digit = parseInt(raw12[i], 10)
+    sum += i % 2 === 0 ? digit : digit * 3
+  }
+  const checkDigit = (10 - (sum % 10)) % 10
+  return `${raw12}${checkDigit}`
+}

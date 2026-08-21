@@ -122,6 +122,19 @@ export interface ItemUnit {
   buy_price?: number
 }
 
+export interface ItemPriceHistory {
+  id: string
+  store_id: string
+  item_id: string
+  old_buy_price: number
+  new_buy_price: number
+  old_sell_price: number
+  new_sell_price: number
+  changed_by?: string
+  change_reason?: string
+  created_at: string
+}
+
 export interface StockBalance {
   id?: string
   store_id: string

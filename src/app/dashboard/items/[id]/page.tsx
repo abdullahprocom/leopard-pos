@@ -12,10 +12,10 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { ArrowRight, Plus, Trash2, Save, Scale, AlertCircle, FolderPlus, Check, X, Pill, Shirt, Sparkles } from 'lucide-react'
+import { ArrowRight, Plus, Trash2, Save, Scale, AlertCircle, FolderPlus, Check, X, Pill, Shirt, Sparkles, Wand2, History, TrendingUp, TrendingDown, ArrowUpRight } from 'lucide-react'
 import { toast } from 'sonner'
-import type { ItemType, ItemStatus } from '@/lib/types'
-import { cleanPositivePrice, cleanPositiveQuantity, money } from '@/lib/finance'
+import type { ItemType, ItemStatus, ItemPriceHistory } from '@/lib/types'
+import { cleanPositivePrice, cleanPositiveQuantity, money, generateBarcode } from '@/lib/finance'
 
 export default function EditItemPage() {
   const router = useRouter()
@@ -53,6 +53,8 @@ export default function EditItemPage() {
   const [buyPrice, setBuyPrice] = useState('0')
   const [sellPrice, setSellPrice] = useState('0')
   const [minSellPrice, setMinSellPrice] = useState('0')
+  const [originalBuyPrice, setOriginalBuyPrice] = useState(0)
+  const [originalSellPrice, setOriginalSellPrice] = useState(0)
 
   // Barcodes
   const [barcodes, setBarcodes] = useState<{ barcode: string; is_primary: boolean }[]>([
@@ -78,6 +80,12 @@ export default function EditItemPage() {
   }, [])
 
   const categories = useLiveQuery(() => db.categories.toArray(), []) || []
+
+  // Fetch price history audit log for this item
+  const priceHistoryList = useLiveQuery(async () => {
+    if (!itemId) return []
+    return await db.item_price_history.where('item_id').equals(itemId).reverse().sortBy('created_at')
+  }, [itemId]) || []
 
   // Dynamic Suggestion Chips for Unit of Measure based on profile
   const unitSuggestions = isSupermarket 
@@ -114,6 +122,8 @@ export default function EditItemPage() {
         setBuyPrice(String(item.buy_price || 0))
         setSellPrice(String(item.sell_price || 0))
         setMinSellPrice(String(item.min_sell_price || 0))
+        setOriginalBuyPrice(item.buy_price || 0)
+        setOriginalSellPrice(item.sell_price || 0)
         setManageInventory(item.manage_inventory ?? true)
         setLowStockAlert(String(item.low_stock_alert || 5))
 
@@ -129,10 +139,16 @@ export default function EditItemPage() {
         setColor(item.color || '')
         setBrand(item.brand || '')
 
-        // Load barcodes
+        // Load barcodes (filter primary/manual barcodes)
         const existingBarcodes = await db.item_barcodes.where('item_id').equals(itemId).toArray()
         if (existingBarcodes.length > 0) {
-          setBarcodes(existingBarcodes.map(b => ({ barcode: b.barcode, is_primary: b.is_primary })))
+          // Exclude unit barcodes from the general barcodes list if they have unit_name
+          const generalBarcodes = existingBarcodes.filter(b => !b.unit_name)
+          if (generalBarcodes.length > 0) {
+            setBarcodes(generalBarcodes.map(b => ({ barcode: b.barcode, is_primary: b.is_primary })))
+          } else {
+            setBarcodes([{ barcode: existingBarcodes[0].barcode, is_primary: true }])
+          }
         }
 
         // Load units
@@ -292,12 +308,30 @@ export default function EditItemPage() {
         updated_at: now
       }
 
-      await db.transaction('rw', [db.items, db.item_barcodes, db.item_units, db.sync_queue], async () => {
+      await db.transaction('rw', [db.items, db.item_barcodes, db.item_units, db.item_price_history, db.sync_queue], async () => {
         // 1. Update item
         await db.items.update(itemId, updatedItem)
         syncEngine.enqueueOperation('items', 'UPDATE', updatedItem)
 
-        // 2. Refresh barcodes
+        // 2. Price History Audit Record if price changed
+        const priceChanged = Math.abs(cleanBuy - originalBuyPrice) > 0.001 || Math.abs(cleanSell - originalSellPrice) > 0.001
+        if (priceChanged) {
+          const priceHistoryRecord: ItemPriceHistory = {
+            id: crypto.randomUUID(),
+            store_id: storeId,
+            item_id: itemId,
+            old_buy_price: originalBuyPrice,
+            new_buy_price: cleanBuy,
+            old_sell_price: originalSellPrice,
+            new_sell_price: cleanSell,
+            change_reason: 'تحديث تسعير الصنف من شاشة تعديل الصنف',
+            created_at: now
+          }
+          await db.item_price_history.add(priceHistoryRecord)
+          syncEngine.enqueueOperation('item_price_history', 'INSERT', priceHistoryRecord)
+        }
+
+        // 3. Refresh barcodes
         await db.item_barcodes.where('item_id').equals(itemId).delete()
         for (const b of validBarcodes) {
           const itemBarcode = {
@@ -312,18 +346,24 @@ export default function EditItemPage() {
           syncEngine.enqueueOperation('item_barcodes', 'INSERT', itemBarcode)
         }
 
-        // 3. Refresh units
+        // 4. Refresh units with hierarchical cumulative conversion factor
         await db.item_units.where('item_id').equals(itemId).delete()
+        let cumulativeConversion = 1
         let parentUnitName: string | undefined = undefined
+
         for (let i = 0; i < units.length; i++) {
           const u = units[i]
+          const qtyInParent = Math.max(1, Math.floor(Math.abs(Number(u.qty_in_parent) || 1)))
+          cumulativeConversion = i === 0 ? 1 : cumulativeConversion * qtyInParent
+
           const itemUnit = {
             id: crypto.randomUUID(),
             store_id: storeId,
             item_id: itemId,
             level: u.level,
             unit_name: u.unit_name.trim() || (allowDecimal ? 'كيلو جرام' : 'قطعة'),
-            qty_in_parent: Math.max(1, Math.floor(Math.abs(Number(u.qty_in_parent) || 1))),
+            qty_in_parent: qtyInParent,
+            conversion_factor: cumulativeConversion,
             parent_unit: parentUnitName,
             barcode: u.barcode?.trim() || undefined,
             sell_price: u.sell_price ? cleanPositivePrice(u.sell_price) : undefined,
@@ -332,10 +372,27 @@ export default function EditItemPage() {
           await db.item_units.add(itemUnit)
           syncEngine.enqueueOperation('item_units', 'INSERT', itemUnit)
           parentUnitName = u.unit_name.trim()
+
+          // If unit has its own barcode, register in item_barcodes with conversion factor
+          if (u.barcode?.trim()) {
+            const unitBarcodeRecord = {
+              id: crypto.randomUUID(),
+              store_id: storeId,
+              item_id: itemId,
+              barcode: u.barcode.trim(),
+              is_primary: false,
+              unit_name: u.unit_name.trim(),
+              conversion_factor: cumulativeConversion,
+              price_override: u.sell_price ? cleanPositivePrice(u.sell_price) : undefined,
+              created_at: now
+            }
+            await db.item_barcodes.add(unitBarcodeRecord)
+            syncEngine.enqueueOperation('item_barcodes', 'INSERT', unitBarcodeRecord)
+          }
         }
       })
 
-      toast.success('تم تحديث المنتج بنجاح')
+      toast.success('تم تحديث المنتج وتسجيل التدقيق المالي بنجاح')
       router.push('/dashboard/items')
       router.refresh()
 
@@ -351,10 +408,11 @@ export default function EditItemPage() {
     if (!confirm('هل أنت متأكد من حذف هذا المنتج نهائياً؟')) return
     try {
       setIsSubmitting(true)
-      await db.transaction('rw', [db.items, db.item_barcodes, db.item_units, db.stock_balances, db.sync_queue], async () => {
+      await db.transaction('rw', [db.items, db.item_barcodes, db.item_units, db.item_price_history, db.stock_balances, db.sync_queue], async () => {
         await db.items.delete(itemId)
         await db.item_barcodes.where('item_id').equals(itemId).delete()
         await db.item_units.where('item_id').equals(itemId).delete()
+        await db.item_price_history.where('item_id').equals(itemId).delete()
         await db.stock_balances.where('item_id').equals(itemId).delete()
         syncEngine.enqueueOperation('items', 'DELETE', { id: itemId })
       })
@@ -387,7 +445,7 @@ export default function EditItemPage() {
           </Button>
           <div>
             <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">تعديل المنتج: {name}</h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold">تعديل الأسعار والمواصفات والوحدات والباركودات</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold">تعديل الأسعار والمواصفات والوحدات والباركودات وتتبع سجل الأسعار</p>
           </div>
         </div>
 
@@ -409,7 +467,7 @@ export default function EditItemPage() {
         <div className="lg:col-span-2 space-y-6">
           <Card className="border-slate-200/90 dark:border-slate-800 shadow-sm">
             <CardHeader className="border-b border-slate-100 dark:border-slate-800/80 pb-4">
-              <CardTitle className="text-lg font-black text-slate-900 dark:text-white">المعلومات الأساسية</CardTitle>
+              <CardTitle className="text-lg font-black text-slate-900 dark:text-white">المعلومات الأساسية والأسماء المتعددة</CardTitle>
             </CardHeader>
             <CardContent className="space-y-5 pt-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -418,8 +476,8 @@ export default function EditItemPage() {
                   <Input id="name" value={name} onChange={e => setName(e.target.value)} className="h-12 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 font-bold" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="nameEn" className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">اسم المنتج (إنجليزي)</Label>
-                  <Input id="nameEn" value={nameEn} onChange={e => setNameEn(e.target.value)} className="h-12 text-left bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 font-bold" dir="ltr" />
+                  <Label htmlFor="nameEn" className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">اسم المنتج (إنجليزي / الاسم التجاري البديل)</Label>
+                  <Input id="nameEn" value={nameEn} onChange={e => setNameEn(e.target.value)} placeholder="English or alternative name..." className="h-12 text-left bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 font-bold" dir="ltr" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="sku" className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">كود الصنف (SKU)</Label>
@@ -610,7 +668,7 @@ export default function EditItemPage() {
                 ديناميكية وحدات القياس ومستويات التعبئة (Dynamic UOM)
               </CardTitle>
               <CardDescription className="text-slate-500 dark:text-slate-400 font-medium">
-                تحديد اسم أي وحدة قياس ومعامل التفكيك الرياضي (Conversion Factor)
+                تحديد اسم أي وحدة قياس ومعامل التفكيك الهرمي المستمر (Conversion Factor)
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5 pt-6">
@@ -684,9 +742,26 @@ export default function EditItemPage() {
                   )}
                   <div className="flex-1 space-y-2">
                     <Label className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">باركود خاص بالوحدة (اختياري)</Label>
-                    <Input value={unit.barcode} onChange={e => {
-                      const newUnits = [...units]; newUnits[index].barcode = e.target.value; setUnits(newUnits)
-                    }} className="h-12 font-mono bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 font-bold" dir="ltr" />
+                    <div className="flex items-center gap-1.5">
+                      <Input value={unit.barcode} onChange={e => {
+                        const newUnits = [...units]; newUnits[index].barcode = e.target.value; setUnits(newUnits)
+                      }} className="h-12 font-mono bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 font-bold" dir="ltr" placeholder="باركود العبوة..." />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        title="توليد باركود للوحدة"
+                        onClick={() => {
+                          const newUnits = [...units]
+                          newUnits[index].barcode = generateBarcode()
+                          setUnits(newUnits)
+                          toast.success(`تم توليد باركود لوحدة (${unit.unit_name}) بنجاح`)
+                        }}
+                        className="h-12 w-12 shrink-0 border-slate-300 dark:border-slate-700 hover:border-blue-500 hover:text-blue-600 cursor-pointer"
+                      >
+                        <Wand2 className="w-4 h-4 text-blue-600" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -757,12 +832,12 @@ export default function EditItemPage() {
           </Card>
         </div>
 
-        {/* Column 2: Pricing & Barcodes */}
+        {/* Column 2: Pricing & Barcodes & Price History Audit */}
         <div className="space-y-6">
           <Card className="border-slate-200/90 dark:border-slate-800 shadow-sm">
             <CardHeader className="border-b border-slate-100 dark:border-slate-800/80 pb-4">
               <CardTitle className="text-lg font-black text-slate-900 dark:text-white">
-                التسعير {allowDecimal ? '(سعر الكيلوجرام)' : `(سعر الـ ${units[0]?.unit_name || 'قطعة'})`}
+                التسعير المالي {allowDecimal ? '(سعر الكيلوجرام)' : `(سعر الـ ${units[0]?.unit_name || 'قطعة'})`}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 pt-6">
@@ -839,9 +914,63 @@ export default function EditItemPage() {
             </CardContent>
           </Card>
 
+          {/* 📈 Price History Audit Trail (سجل تغيرات الأسعار) */}
           <Card className="border-slate-200/90 dark:border-slate-800 shadow-sm">
             <CardHeader className="border-b border-slate-100 dark:border-slate-800/80 pb-4">
-              <CardTitle className="text-lg font-black text-slate-900 dark:text-white">الباركود الدولي</CardTitle>
+              <CardTitle className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+                <History className="w-5 h-5 text-blue-600" />
+                سجل التدقيق المالي وتغير الأسعار
+              </CardTitle>
+              <CardDescription className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                تتبع تاريخي لكل تعديل في أسعار التكلفة أو البيع
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              {priceHistoryList.length === 0 ? (
+                <div className="p-5 text-center text-xs text-slate-400 font-medium">
+                  لا توجد تعديلات أسعار سابقة مسجلة لهذا الصنف
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-64 overflow-y-auto">
+                  {priceHistoryList.map(hist => {
+                    const sellDiff = (hist.new_sell_price || 0) - (hist.old_sell_price || 0)
+                    const isIncrease = sellDiff > 0
+                    return (
+                      <div key={hist.id} className="p-3.5 space-y-1.5 hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-mono text-slate-400 dark:text-slate-500 font-bold text-[11px]">
+                            {new Date(hist.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md text-[11px] font-black ${isIncrease ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400' : 'bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400'}`}>
+                            {isIncrease ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                            {sellDiff > 0 ? `+${sellDiff.toFixed(2)} ج.م` : `${sellDiff.toFixed(2)} ج.م`}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
+                          <div>
+                            سعر البيع: <span className="line-through text-slate-400">{hist.old_sell_price}</span> ➔ <span className="text-blue-600 dark:text-blue-400 font-black">{hist.new_sell_price} ج.م</span>
+                          </div>
+                          <div className="text-[11px] text-slate-500">
+                            التكلفة: {hist.new_buy_price} ج.م
+                          </div>
+                        </div>
+                        {hist.change_reason && (
+                          <div className="text-[10px] text-slate-400 italic">
+                            {hist.change_reason}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Barcodes Card with Auto-Generator */}
+          <Card className="border-slate-200/90 dark:border-slate-800 shadow-sm">
+            <CardHeader className="border-b border-slate-100 dark:border-slate-800/80 pb-4">
+              <CardTitle className="text-lg font-black text-slate-900 dark:text-white">الباركود الدولي والتلقائي</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 pt-6">
               {barcodes.map((b, index) => (
@@ -855,6 +984,22 @@ export default function EditItemPage() {
                     className="h-12 font-mono font-bold bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700"
                     dir="ltr"
                   />
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    title="توليد باركود تلقائي EAN-13" 
+                    onClick={() => {
+                      const newBarcodes = [...barcodes]
+                      newBarcodes[index].barcode = generateBarcode()
+                      setBarcodes(newBarcodes)
+                      toast.success('تم توليد باركود تلقائي بنجاح')
+                    }}
+                    className="h-12 px-3 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:text-blue-600 hover:border-blue-500 cursor-pointer shrink-0 font-bold text-xs"
+                  >
+                    <Wand2 className="w-4 h-4 ml-1 text-blue-600" />
+                    توليد
+                  </Button>
                   {index > 0 && (
                     <Button variant="ghost" size="icon" className="shrink-0 text-rose-500 hover:text-rose-600 cursor-pointer" onClick={() => removeBarcode(index)}>
                       <Trash2 className="h-5 w-5" />
