@@ -3,13 +3,14 @@
 import { useState, useEffect, useRef } from 'react'
 import { db, getDeviceId } from '@/lib/db'
 import { generateSaleNumber, cleanPositiveQuantity, cleanPositivePrice, cleanPositiveDiscount, money, formatCurrency } from '@/lib/finance'
-import { syncEngine } from '@/lib/sync-engine'
+import { syncEngine, DEFAULT_STORE_UUID, DEFAULT_BRANCH_UUID } from '@/lib/sync-engine'
 import { useStore } from '@/lib/store-context'
 import { toast } from 'sonner'
-import { Search, Plus, Minus, Trash2, ShoppingCart, CreditCard, Banknote, X, CheckCircle2, User, Sparkles, Printer, RotateCcw } from 'lucide-react'
+import { Search, Plus, Minus, Trash2, ShoppingCart, CreditCard, Banknote, X, CheckCircle2, User, Sparkles, Printer, RotateCcw, Scale, Weight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { WeightScaleModal } from '@/components/WeightScaleModal'
 import { ThermalReceipt } from './receipt'
 import type { Sale, SaleLine, CashTransaction } from '@/lib/types'
 
@@ -33,6 +34,10 @@ export default function POSPage() {
   const [paidAmount, setPaidAmount] = useState<string>('')
   const [lastSale, setLastSale] = useState<any>(null)
   const [isProcessing, setIsProcessing] = useState(false)
+
+  // Scale Modal State
+  const [scaleModalOpen, setScaleModalOpen] = useState(false)
+  const [scaleItem, setScaleItem] = useState<any>(null)
 
   const searchInputRef = useRef<HTMLInputElement>(null)
 
@@ -75,11 +80,17 @@ export default function POSPage() {
         item = await db.items.where('sku').equals(query).first()
       }
       if (!item) {
-        item = await db.items.filter(i => (i.search_text || i.name).toLowerCase().includes(query)).first()
+        item = await db.items.filter(i => (i.search_text || i.name || '').toLowerCase().includes(query)).first()
       }
 
       if (item) {
-        addToCart(item)
+        if (item.allow_decimal) {
+          // Open Smart Scale Calculator immediately for weight-based items
+          setScaleItem(item)
+          setScaleModalOpen(true)
+        } else {
+          addToCart(item, 1)
+        }
         setSearchTerm('')
       } else {
         toast.error('لم يتم العثور على الصنف - تأكد من قراءة الباركود أو كتابة الاسم بشكل صحيح')
@@ -87,14 +98,17 @@ export default function POSPage() {
     }
   }
 
-  const addToCart = (item: any) => {
-    const price = cleanPositivePrice(item.sell_price || 0)
+  const addToCart = (item: any, quantity: number = 1) => {
+    const price = cleanPositivePrice(item.sell_price || item.unit_price || 0)
     const allowDec = Boolean(item.allow_decimal)
+    const validQty = cleanPositiveQuantity(quantity, allowDec)
 
     setCart(prev => {
       const existing = prev.find(i => i.item_id === item.id)
       if (existing) {
-        const nextQty = cleanPositiveQuantity(existing.quantity + 1, allowDec)
+        const nextQty = allowDec 
+          ? validQty 
+          : cleanPositiveQuantity(existing.quantity + validQty, false)
         const nextTotal = money(nextQty * existing.unit_price - existing.discount)
         return prev.map(i => i.item_id === item.id 
           ? { ...i, quantity: nextQty, total: Math.max(0, nextTotal) } 
@@ -105,20 +119,62 @@ export default function POSPage() {
         id: crypto.randomUUID(),
         item_id: item.id,
         name: item.name,
-        quantity: 1,
+        quantity: validQty,
         unit_price: price,
         discount: 0,
-        total: price,
+        total: money(validQty * price),
         allow_decimal: allowDec
       }]
     })
-    toast.success(`تمت إضافة: ${item.name}`, { duration: 1200 })
+    toast.success(`تمت إضافة: ${item.name} (${validQty} ${allowDec ? 'كجم' : 'قطعة'})`, { duration: 1500 })
+  }
+
+  const handleOpenScaleForCartItem = (cartItem: CartItem) => {
+    setScaleItem({
+      id: cartItem.item_id,
+      name: cartItem.name,
+      sell_price: cartItem.unit_price,
+      quantity: cartItem.quantity
+    })
+    setScaleModalOpen(true)
+  }
+
+  const handleScaleConfirm = (calculatedKg: number) => {
+    if (!scaleItem) return
+    const validKg = cleanPositiveQuantity(calculatedKg, true)
+    const price = cleanPositivePrice(scaleItem.sell_price || scaleItem.unit_price || 0)
+
+    setCart(prev => {
+      const existing = prev.find(i => i.item_id === scaleItem.id)
+      if (existing) {
+        const nextTotal = money(validKg * existing.unit_price - existing.discount)
+        return prev.map(i => i.item_id === scaleItem.id
+          ? { ...i, quantity: validKg, total: Math.max(0, nextTotal) }
+          : i
+        )
+      }
+      return [...prev, {
+        id: crypto.randomUUID(),
+        item_id: scaleItem.id,
+        name: scaleItem.name,
+        quantity: validKg,
+        unit_price: price,
+        discount: 0,
+        total: money(validKg * price),
+        allow_decimal: true
+      }]
+    })
+
+    const grams = Math.round(validKg * 1000)
+    const totalCalc = money(validKg * price)
+    toast.success(`تم إدراج الوزن: ${validKg} كجم (${grams} جم) بسعر ${totalCalc.toFixed(2)} ج.م`)
   }
 
   const updateQuantity = (id: string, delta: number) => {
     setCart(prev => prev.map(item => {
       if (item.id === id) {
-        const newQty = cleanPositiveQuantity(item.quantity + delta, item.allow_decimal)
+        const step = item.allow_decimal ? 0.250 : 1 // Step by 250g for weight items
+        const newQty = cleanPositiveQuantity(item.quantity + (delta > 0 ? step : -step), item.allow_decimal)
         const newTotal = money(newQty * item.unit_price - item.discount)
         return { ...item, quantity: newQty, total: Math.max(0, newTotal) }
       }
@@ -181,9 +237,8 @@ export default function POSPage() {
       const saleId = crypto.randomUUID()
       const now = new Date().toISOString()
       const saleNumber = generateSaleNumber()
-      const activeStoreId = storeId || 'default-store-001'
-      const activeBranchId = branchId || 'default-branch-001'
-      const deviceId = getDeviceId()
+      const activeStoreId = storeId || DEFAULT_STORE_UUID
+      const activeBranchId = branchId || DEFAULT_BRANCH_UUID
 
       const sale: Sale = {
         id: saleId,
@@ -232,7 +287,7 @@ export default function POSPage() {
           // Safe stock reduction
           const stock = await db.stock_balances.where({ store_id: activeStoreId, item_id: item.item_id, branch_id: activeBranchId }).first()
           if (stock) {
-            const safeNewStock = stock.quantity - item.quantity
+            const safeNewStock = Math.max(0, stock.quantity - item.quantity)
             await db.stock_balances.where({ store_id: activeStoreId, item_id: item.item_id, branch_id: activeBranchId }).modify({
               quantity: safeNewStock,
               updated_at: now
@@ -266,10 +321,11 @@ export default function POSPage() {
             store_id: activeStoreId,
             branch_id: activeBranchId,
             type: 'sale',
+            direction: 'in',
             amount: parsedPaid >= totalAmount ? totalAmount : parsedPaid,
             payment_method: 'cash',
-            reference_type: 'sale',
-            reference_id: saleId,
+            source_table: 'sales',
+            source_id: saleId,
             notes: `تحصيل فاتورة بيع ${saleNumber}`,
             created_at: now
           }
@@ -280,7 +336,7 @@ export default function POSPage() {
 
       // Prepare receipt data
       const receiptData = {
-        storeName: storeName || 'APR Supermarket',
+        storeName: storeName || 'ERP Supermarket',
         invoiceNumber: saleNumber,
         date: new Date().toLocaleString('ar-EG'),
         customerName: customerName || 'عميل نقدي',
@@ -330,7 +386,7 @@ export default function POSPage() {
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             onKeyDown={handleSearchKeyDown}
-            className="pr-12 h-14 text-base font-bold bg-slate-50/80 dark:bg-slate-800/80 rounded-xl"
+            className="pr-12 h-14 text-base font-bold bg-slate-50/80 dark:bg-slate-800/80 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 rounded-xl"
             autoFocus
           />
         </div>
@@ -342,7 +398,7 @@ export default function POSPage() {
               placeholder="اسم العميل"
               value={customerName}
               onChange={e => setCustomerName(e.target.value)}
-              className="pr-10 h-14 text-sm font-bold bg-slate-50/80 dark:bg-slate-800/80 rounded-xl"
+              className="pr-10 h-14 text-sm font-bold bg-slate-50/80 dark:bg-slate-800/80 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 rounded-xl"
             />
           </div>
 
@@ -350,7 +406,7 @@ export default function POSPage() {
             variant="outline" 
             size="icon" 
             onClick={clearCart} 
-            className="h-14 w-14 rounded-xl border-slate-300 dark:border-slate-700 text-slate-500 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 shrink-0" 
+            className="h-14 w-14 rounded-xl border-slate-300 dark:border-slate-700 text-slate-500 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 shrink-0 cursor-pointer" 
             title="مسح السلة بالكامل (Esc)"
           >
             <RotateCcw className="h-5 w-5" />
@@ -375,71 +431,98 @@ export default function POSPage() {
             {cart.length === 0 ? (
               <div className="h-full min-h-[300px] flex flex-col items-center justify-center text-slate-400 space-y-3">
                 <ShoppingCart className="w-16 h-16 stroke-1 opacity-40 text-blue-500" />
-                <p className="font-bold text-base">السلة فارغة، قم بمسح باركود لبدء الفاتورة</p>
-                <span className="text-xs bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full font-mono">
+                <p className="font-bold text-base text-slate-400">السلة فارغة، قم بمسح باركود لبدء الفاتورة</p>
+                <span className="text-xs bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full font-mono text-slate-400">
                   اختصار لوحة المفاتيح: F2 للبحث، F9 للحفظ والطباعة
                 </span>
               </div>
             ) : (
               <table className="w-full text-right border-collapse">
                 <thead>
-                  <tr className="border-b border-slate-100 dark:border-slate-800 text-xs font-extrabold text-slate-400">
+                  <tr className="border-b border-slate-100 dark:border-slate-800 text-xs font-extrabold text-slate-500 dark:text-slate-400">
                     <th className="p-3">الصنف</th>
-                    <th className="p-3 text-center w-28">السعر</th>
-                    <th className="p-3 text-center w-40">الكمية</th>
+                    <th className="p-3 text-center w-28">سعر الوحدة</th>
+                    <th className="p-3 text-center w-52">الكمية / الوزن</th>
                     <th className="p-3 text-center w-28">الإجمالي</th>
                     <th className="p-3 text-center w-12">حذف</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-bold text-sm">
-                  {cart.map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
-                      <td className="p-3">
-                        <p className="text-slate-900 dark:text-white">{item.name}</p>
-                        {item.allow_decimal && (
-                          <span className="text-[10px] text-blue-500 font-bold">صنف ميزان (كسور كجم)</span>
-                        )}
-                      </td>
-                      <td className="p-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
-                        {item.unit_price.toFixed(2)}
-                      </td>
-                      <td className="p-3 text-center">
-                        <div className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                  {cart.map((item) => {
+                    const isWeight = Boolean(item.allow_decimal)
+                    const grams = Math.round(item.quantity * 1000)
+
+                    return (
+                      <tr key={item.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                        <td className="p-3">
+                          <p className="text-slate-900 dark:text-white font-bold">{item.name}</p>
+                          {isWeight && (
+                            <span className="inline-flex items-center gap-1 text-[11px] text-blue-600 dark:text-blue-400 font-bold mt-0.5">
+                              <Scale className="w-3 h-3" />
+                              صنف ميزان: {item.quantity} كجم ({grams} جم)
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3 text-center font-mono font-bold text-slate-700 dark:text-slate-200">
+                          {item.unit_price.toFixed(2)} ج.م
+                        </td>
+                        <td className="p-3 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <div className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                              <button 
+                                type="button"
+                                onClick={() => updateQuantity(item.id, -1)}
+                                className="w-7 h-7 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 active:scale-95 transition-all cursor-pointer"
+                                title={isWeight ? "إنقاص 250 جم" : "إنقاص 1"}
+                              >
+                                <Minus className="w-3.5 h-3.5" />
+                              </button>
+                              <input 
+                                type="number"
+                                min="0.001"
+                                step={isWeight ? "0.001" : "1"}
+                                value={item.quantity}
+                                onChange={(e) => handleSetDirectQuantity(item.id, e.target.value)}
+                                className="w-16 text-center font-mono font-black text-sm bg-transparent text-slate-900 dark:text-white outline-none"
+                              />
+                              <button 
+                                type="button"
+                                onClick={() => updateQuantity(item.id, 1)}
+                                className="w-7 h-7 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 active:scale-95 transition-all cursor-pointer"
+                                title={isWeight ? "زيادة 250 جم" : "زيادة 1"}
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+
+                            {/* Weight Scale Modal Trigger Button */}
+                            {isWeight && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenScaleForCartItem(item)}
+                                className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/60 border border-blue-200 dark:border-blue-800/80 transition-colors cursor-pointer shadow-xs"
+                                title="فتح حاسبة الجرامات والمبالغ (مثال: بـ 10 ج)"
+                              >
+                                <Scale className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-3 text-center font-mono font-black text-blue-600 dark:text-blue-400">
+                          {item.total.toFixed(2)} ج.م
+                        </td>
+                        <td className="p-3 text-center">
                           <button 
-                            onClick={() => updateQuantity(item.id, -1)}
-                            className="w-7 h-7 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 active:scale-95 transition-all cursor-pointer"
+                            type="button"
+                            onClick={() => removeFromCart(item.id)}
+                            className="p-2 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
                           >
-                            <Minus className="w-3.5 h-3.5" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
-                          <input 
-                            type="number"
-                            min="0.001"
-                            step={item.allow_decimal ? "0.001" : "1"}
-                            value={item.quantity}
-                            onChange={(e) => handleSetDirectQuantity(item.id, e.target.value)}
-                            className="w-14 text-center font-mono font-black bg-transparent text-slate-900 dark:text-white outline-none"
-                          />
-                          <button 
-                            onClick={() => updateQuantity(item.id, 1)}
-                            className="w-7 h-7 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 active:scale-95 transition-all cursor-pointer"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                      <td className="p-3 text-center font-mono font-black text-blue-600 dark:text-blue-400">
-                        {item.total.toFixed(2)}
-                      </td>
-                      <td className="p-3 text-center">
-                        <button 
-                          onClick={() => removeFromCart(item.id)}
-                          className="p-2 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             )}
@@ -504,62 +587,56 @@ export default function POSPage() {
               </div>
             </div>
 
-            {/* Cash Paid & Change Calculator */}
-            {paymentMethod === 'cash' && (
-              <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-bold text-slate-600 dark:text-slate-300">المبلغ المدفوع من العميل:</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.5"
-                    placeholder={`مثال: ${totalAmount.toFixed(0)}`}
-                    value={paidAmount}
-                    onChange={e => setPaidAmount(Math.max(0, parseFloat(e.target.value) || 0).toString())}
-                    className="h-12 text-lg font-mono font-bold text-center bg-slate-50/80 dark:bg-slate-800/80 rounded-xl"
-                  />
-                </div>
-
-                <div className="flex justify-between items-center p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400">
-                  <span className="text-xs font-bold">المتبقي للعميل (الفكة):</span>
-                  <span className="text-lg font-black font-mono">{change.toFixed(2)} ج.م</span>
-                </div>
+            {/* Cash Input */}
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  المبلغ المدفوع من العميل:
+                </Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  placeholder="مثال: 0"
+                  value={paidAmount}
+                  onChange={e => setPaidAmount(e.target.value)}
+                  className="h-12 text-lg font-mono font-bold text-center bg-slate-50/80 dark:bg-slate-800/80 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl"
+                />
               </div>
-            )}
+
+              <div className="flex justify-between items-center p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+                <span className="text-xs font-bold">المتبقي للعميل (الفكة):</span>
+                <span className="text-lg font-black font-mono">{change.toFixed(2)} ج.م</span>
+              </div>
+            </div>
           </div>
 
-          {/* Checkout Big Button */}
           <Button
+            size="lg"
             onClick={handleCompleteSale}
             disabled={cart.length === 0 || isProcessing}
-            size="lg"
-            className="w-full h-16 text-lg font-black bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl shadow-xl shadow-emerald-600/30 active:scale-95 transition-all cursor-pointer"
+            className="w-full h-16 text-lg font-black bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl shadow-xl shadow-emerald-600/30 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
           >
             <CheckCircle2 className="w-6 h-6 ml-2" />
-            {isProcessing ? 'جاري الاعتماد والطباعة...' : `إتمام الفاتورة والطباعة (${totalAmount.toFixed(2)} ج.م)`}
+            {isProcessing ? 'جاري الحفظ...' : `إتمام الفاتورة والطباعة (${totalAmount.toFixed(2)} ج.م)`}
           </Button>
-
         </div>
-
       </div>
 
-      {/* Hidden Thermal Receipt for Direct Printing */}
-      {lastSale && (
-        <ThermalReceipt
-          storeName={lastSale.storeName}
-          invoiceNumber={lastSale.invoiceNumber}
-          date={lastSale.date}
-          customerName={lastSale.customerName}
-          items={lastSale.items}
-          subtotal={lastSale.subtotal}
-          discount={lastSale.discount}
-          tax={lastSale.tax}
-          total={lastSale.total}
-          paid={lastSale.paid}
-          change={lastSale.change}
-        />
-      )}
+      {/* Weight & Cash Calculator Modal */}
+      <WeightScaleModal
+        isOpen={scaleModalOpen}
+        onClose={() => setScaleModalOpen(false)}
+        item={scaleItem}
+        onConfirm={handleScaleConfirm}
+      />
 
+      {/* Hidden thermal receipt for printing */}
+      {lastSale && (
+        <div className="hidden print:block">
+          <ThermalReceipt {...lastSale} />
+        </div>
+      )}
     </div>
   )
 }

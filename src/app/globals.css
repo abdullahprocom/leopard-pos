@@ -20,8 +20,8 @@
     --accent-foreground: #f8fafc;
     --destructive: #ef4444;
     --destructive-foreground: #ffffff;
-    --border: #1e293b;
-    --input: #1e293b;
+    --border: #334155;
+    --input: #334155;
     --ring: #3b82f6;
     --radius: 1rem;
   }
@@ -43,8 +43,8 @@
     --accent-foreground: #f8fafc;
     --destructive: #ef4444;
     --destructive-foreground: #ffffff;
-    --border: #1e293b;
-    --input: #1e293b;
+    --border: #334155;
+    --input: #334155;
     --ring: #3b82f6;
   }
 
@@ -58,6 +58,11 @@
     font-feature-settings: "rlig" 1, "calt" 1;
     -webkit-font-smoothing: antialiased;
     transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  /* Form Labels & Text High Visibility */
+  label {
+    color: #f8fafc;
   }
 
   /* Custom Sleek Dark Scrollbar */

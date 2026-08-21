@@ -160,8 +160,13 @@ export default function ItemsPage() {
                     >
                       {/* Name & Subtitle */}
                       <td className="py-4 px-6">
-                        <div className="font-extrabold text-sm text-slate-900 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                          {item.name}
+                        <div className="font-extrabold text-sm text-slate-900 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors flex items-center gap-2">
+                          <span>{item.name}</span>
+                          {item.allow_decimal && (
+                            <span className="text-[10px] bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/80 px-2 py-0.5 rounded-md font-bold">
+                              ⚖️ ميزان (كجم)
+                            </span>
+                          )}
                         </div>
                         {item.name_en && (
                           <div className="text-[11px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">{item.name_en}</div>
@@ -196,12 +201,12 @@ export default function ItemsPage() {
 
                       {/* Sell Price */}
                       <td className="py-4 px-6 font-black text-blue-600 dark:text-blue-400 font-mono text-base">
-                        {item.sell_price.toFixed(2)} <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">ج.م</span>
+                        {item.sell_price.toFixed(2)} <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">{item.allow_decimal ? 'ج.م / كجم' : 'ج.م'}</span>
                       </td>
 
                       {/* Stock Pill */}
                       <td className="py-4 px-6 text-center">
-                        {item.manage_inventory ? (
+                        {item.manage_inventory !== false ? (
                           <span 
                             className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-black shadow-2xs ${
                               isLowStock
@@ -209,7 +214,7 @@ export default function ItemsPage() {
                                 : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
                             }`}
                           >
-                            {item.current_stock} {item.unit || 'قطعة'}
+                            {item.current_stock} {item.allow_decimal ? 'كجم' : (item.unit || 'قطعة')}
                           </span>
                         ) : (
                           <span className="text-slate-400 dark:text-slate-500 text-xs font-medium">غير متتبع</span>
