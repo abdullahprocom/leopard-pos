@@ -10,18 +10,26 @@ import { Search, Undo2, AlertCircle, CheckCircle2, FileText } from 'lucide-react
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useStore } from '@/lib/store-context'
 import type { PurchaseReturn, PurchaseReturnLine, CashTransaction } from '@/lib/types'
 
 export default function PurchaseReturnsPage() {
+  const { storeId, branchId } = useStore()
+  const currentStoreId = storeId || DEFAULT_STORE_UUID
+  const currentBranchId = branchId || DEFAULT_BRANCH_UUID
+
   const [purchaseNumber, setPurchaseNumber] = useState('')
   const [purchaseSearchTerm, setPurchaseSearchTerm] = useState('')
   const [returnQuantities, setReturnQuantities] = useState<Record<string, number>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Search purchase invoice
+  // Search purchase invoice strictly for current store
   const currentPurchase = useLiveQuery(async () => {
     if (!purchaseSearchTerm) return null
-    const purchase = await db.purchases.where('purchase_number').equals(purchaseSearchTerm.trim()).first()
+    const purchase = await db.purchases
+      .where('store_id').equals(currentStoreId)
+      .and(p => p.purchase_number === purchaseSearchTerm.trim())
+      .first()
     if (!purchase) return null
     const lines = await db.purchase_lines.where('purchase_id').equals(purchase.id).toArray()
     const enrichedLines = await Promise.all(lines.map(async line => {
@@ -32,11 +40,12 @@ export default function PurchaseReturnsPage() {
       }
     }))
     return { purchase, lines: enrichedLines }
-  }, [purchaseSearchTerm])
+  }, [purchaseSearchTerm, currentStoreId])
 
-  // List existing purchase returns
+  // List existing purchase returns strictly for current store
   const returnsList = useLiveQuery(
-    () => db.purchase_returns.orderBy('created_at').reverse().toArray()
+    () => db.purchase_returns.where('store_id').equals(currentStoreId).reverse().sortBy('created_at'),
+    [currentStoreId]
   ) || []
 
   const handleSearchPurchase = () => {

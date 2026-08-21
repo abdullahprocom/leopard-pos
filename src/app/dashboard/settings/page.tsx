@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { db } from '@/lib/db'
-import { syncEngine, DEFAULT_STORE_UUID, DEFAULT_USER_UUID } from '@/lib/sync-engine'
+import { syncEngine, DEFAULT_STORE_UUID, DEFAULT_USER_UUID, getTenantInfo } from '@/lib/sync-engine'
 import { useStore } from '@/lib/store-context'
 import { BusinessType } from '@/lib/types'
 import { toast } from 'sonner'
@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 export default function SettingsPage() {
-  const { storeName, setStoreName, businessType, setBusinessType, purgeAndReseedCategories, activationToken, activateOfflineSystem, isActivated } = useStore()
+  const { storeId, branchId, storeName, setStoreName, businessType, setBusinessType, purgeAndReseedCategories, activationToken, activateOfflineSystem, isActivated } = useStore()
   const [localStoreName, setLocalStoreName] = useState(storeName)
   const [localBusinessType, setLocalBusinessType] = useState<BusinessType>(businessType)
   const [currency, setCurrency] = useState('EGP')
@@ -27,11 +27,14 @@ export default function SettingsPage() {
 
   useEffect(() => {
     async function loadSettings() {
-      const store = await db.stores.toCollection().first()
+      const tenant = getTenantInfo(businessType)
+      const store = await db.stores.where('id').equals(tenant.storeId).first()
       if (store) {
         setLocalStoreName(store.name || storeName)
         setCurrency(store.currency || 'EGP')
         setTaxRate(String(store.tax_rate || 0))
+      } else {
+        setLocalStoreName(storeName)
       }
       const savedPrinter = localStorage.getItem('apr_printer_size') || '80mm'
       const savedFooter = localStorage.getItem('apr_receipt_footer') || 'شكراً لزيارتكم - منظومة APR System'
@@ -49,16 +52,17 @@ export default function SettingsPage() {
     return () => {
       unsubscribe()
     }
-  }, [storeName])
+  }, [storeName, businessType])
 
   const handleSaveAllSettings = async () => {
     try {
       setIsSaving(true)
-      const existing = await db.stores.toCollection().first()
+      const tenant = getTenantInfo(localBusinessType)
+      const existing = await db.stores.where('id').equals(tenant.storeId).first()
       const now = new Date().toISOString()
 
       const storeData = {
-        id: existing?.id || DEFAULT_STORE_UUID,
+        id: tenant.storeId,
         owner_id: existing?.owner_id || DEFAULT_USER_UUID,
         name: localStoreName.trim(),
         business_type: localBusinessType,
@@ -72,9 +76,9 @@ export default function SettingsPage() {
       await db.stores.put(storeData)
       syncEngine.enqueueOperation('stores', 'UPDATE', storeData)
 
-      // Update global context & local storage
+      // Update global context & local storage (dynamically switches active tenant store)
+      await setBusinessType(localBusinessType)
       setStoreName(localStoreName.trim())
-      setBusinessType(localBusinessType)
 
       // Save printer settings in localStorage
       localStorage.setItem('apr_printer_size', printerPaperSize)
@@ -85,7 +89,7 @@ export default function SettingsPage() {
         activateOfflineSystem(inputToken.trim(), localStoreName.trim(), localBusinessType)
       }
 
-      toast.success('تم حفظ كافة إعدادات منظومة ERP بنجاح')
+      toast.success('تم حفظ وتطبيق نشاط المتجر وعزل بياناته بنجاح')
     } catch (err: any) {
       toast.error('حدث خطأ أثناء الحفظ: ' + err.message)
     } finally {
@@ -148,7 +152,16 @@ export default function SettingsPage() {
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
               <Label className="text-xs font-bold text-slate-600 dark:text-slate-300">طبيعة ونوع النشاط</Label>
-              <Select value={localBusinessType} onValueChange={(val) => setLocalBusinessType(val as BusinessType)}>
+              <Select 
+                value={localBusinessType} 
+                onValueChange={(val) => {
+                  const newType = val as BusinessType
+                  setLocalBusinessType(newType)
+                  const tenant = getTenantInfo(newType)
+                  const savedName = (typeof window !== 'undefined' && localStorage.getItem(`erp_store_name_${newType}`)) || tenant.defaultName
+                  setLocalStoreName(savedName)
+                }}
+              >
                 <SelectTrigger className="h-12 text-sm font-bold bg-slate-50/80 dark:bg-slate-800/80 rounded-xl">
                   <SelectValue />
                 </SelectTrigger>

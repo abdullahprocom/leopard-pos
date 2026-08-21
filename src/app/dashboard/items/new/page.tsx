@@ -19,7 +19,7 @@ import { cleanPositiveQuantity, cleanPositivePrice, money, generateBarcode } fro
 
 export default function NewItemPage() {
   const router = useRouter()
-  const { businessType, isPharma, isSupermarket, isClothing } = useStore()
+  const { businessType, isPharma, isSupermarket, isClothing, storeId, branchId } = useStore()
   
   // Basic info
   const [name, setName] = useState('')
@@ -71,12 +71,14 @@ export default function NewItemPage() {
 
   // Fetch categories & ensure defaults strictly isolated per store and business activity
   useEffect(() => {
-    ensureDefaultCategories(DEFAULT_STORE_UUID, businessType)
-  }, [businessType])
+    if (storeId) {
+      ensureDefaultCategories(storeId, businessType)
+    }
+  }, [storeId, businessType])
 
   const categories = useLiveQuery(
-    () => db.categories.where('store_id').equals(DEFAULT_STORE_UUID).sortBy('sort_order'),
-    [businessType]
+    () => storeId ? db.categories.where('store_id').equals(storeId).sortBy('sort_order') : [],
+    [storeId, businessType]
   ) || []
 
   // Dynamic Suggestion Chips for Unit of Measure based on profile
@@ -184,8 +186,8 @@ export default function NewItemPage() {
 
       const itemId = crypto.randomUUID()
       const now = new Date().toISOString()
-      const storeId = DEFAULT_STORE_UUID
-      const branchId = DEFAULT_BRANCH_UUID
+      const currentStoreId = storeId || DEFAULT_STORE_UUID
+      const currentBranchId = branchId || DEFAULT_BRANCH_UUID
 
       // Auto-generate clean SKU if empty
       const finalSku = sku.trim() || `SKU-${Date.now().toString().slice(-6)}`
@@ -193,7 +195,7 @@ export default function NewItemPage() {
       // 2. Main Item Record with Dynamic Fields
       const newItem = {
         id: itemId,
-        store_id: storeId,
+        store_id: currentStoreId,
         name: name.trim(),
         name_en: nameEn.trim() || undefined,
         sku: finalSku,
@@ -241,7 +243,7 @@ export default function NewItemPage() {
           if (b.barcode.trim()) {
             const barcodeRecord = {
               id: crypto.randomUUID(),
-              store_id: storeId,
+              store_id: currentStoreId,
               item_id: itemId,
               barcode: b.barcode.trim(),
               is_primary: b.is_primary,
@@ -262,7 +264,7 @@ export default function NewItemPage() {
           
           const itemUnit = {
             id: crypto.randomUUID(),
-            store_id: storeId,
+            store_id: currentStoreId,
             item_id: itemId,
             level: u.level,
             unit_name: u.unit_name.trim() || (allowDecimal ? 'كيلو جرام' : 'قطعة'),
@@ -281,7 +283,7 @@ export default function NewItemPage() {
           if (u.barcode?.trim()) {
             const unitBarcodeRecord = {
               id: crypto.randomUUID(),
-              store_id: storeId,
+              store_id: currentStoreId,
               item_id: itemId,
               barcode: u.barcode.trim(),
               is_primary: false,
@@ -298,7 +300,7 @@ export default function NewItemPage() {
         // 5. Initial Price History Audit Record
         const priceHistoryRecord = {
           id: crypto.randomUUID(),
-          store_id: storeId,
+          store_id: currentStoreId,
           item_id: itemId,
           old_buy_price: 0,
           new_buy_price: cleanBuy,
@@ -316,8 +318,8 @@ export default function NewItemPage() {
 
         const stockBalance = {
           id: crypto.randomUUID(),
-          store_id: storeId,
-          branch_id: branchId,
+          store_id: currentStoreId,
+          branch_id: currentBranchId,
           item_id: itemId,
           quantity: cleanOpening,
           updated_at: now
@@ -328,8 +330,8 @@ export default function NewItemPage() {
         if (cleanOpening > 0) {
           const ledgerEntry = {
             id: crypto.randomUUID(),
-            store_id: storeId,
-            branch_id: branchId,
+            store_id: currentStoreId,
+            branch_id: currentBranchId,
             item_id: itemId,
             movement_type: 'opening' as const,
             direction: 'in' as const,

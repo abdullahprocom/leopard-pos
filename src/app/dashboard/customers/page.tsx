@@ -10,9 +10,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useStore } from '@/lib/store-context'
+import { DEFAULT_STORE_UUID } from '@/lib/sync-engine'
 import type { Customer } from '@/lib/types'
 
 export default function CustomersPage() {
+  const { storeId } = useStore()
+  const currentStoreId = storeId || DEFAULT_STORE_UUID
   const [searchTerm, setSearchTerm] = useState('')
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
@@ -20,7 +24,8 @@ export default function CustomersPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const customers = useLiveQuery(
-    () => db.customers.orderBy('created_at').reverse().toArray()
+    () => db.customers.where('store_id').equals(currentStoreId).reverse().sortBy('created_at'),
+    [currentStoreId]
   ) || []
 
   const filteredCustomers = customers.filter(c =>
@@ -40,7 +45,7 @@ export default function CustomersPage() {
       const now = new Date().toISOString()
       const newCustomer: Customer = {
         id: crypto.randomUUID(),
-        store_id: 'default',
+        store_id: currentStoreId,
         name: name.trim(),
         phone: phone.trim() || undefined,
         address: address.trim() || undefined,

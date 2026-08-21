@@ -1,6 +1,7 @@
 import Dexie from 'dexie';
 import { db } from '@/lib/db';
 import { createClient } from '@/lib/supabase/client';
+import type { BusinessType } from '@/lib/types';
 
 export type SyncStatus = {
   pending: number;
@@ -9,9 +10,42 @@ export type SyncStatus = {
 };
 
 // Standard valid fallback UUIDs for offline standalone operation
-export const DEFAULT_STORE_UUID = '00000000-0000-0000-0000-000000000001';
-export const DEFAULT_BRANCH_UUID = '00000000-0000-0000-0000-000000000002';
+export const DEFAULT_STORE_UUID = '00000000-0000-0000-0001-000000000001';
+export const DEFAULT_BRANCH_UUID = '00000000-0000-0000-0001-000000000002';
 export const DEFAULT_USER_UUID = '00000000-0000-0000-0000-000000000003';
+
+// 🏢 Multi-Tenant Isolated Store & Branch Mapping per Business Profile
+export const TENANT_STORE_MAP: Record<BusinessType, { storeId: string; branchId: string; defaultName: string }> = {
+  supermarket: {
+    storeId: '00000000-0000-0000-0001-000000000001',
+    branchId: '00000000-0000-0000-0001-000000000002',
+    defaultName: 'سوبر ماركت الهدى',
+  },
+  pharmacy: {
+    storeId: '00000000-0000-0000-0002-000000000001',
+    branchId: '00000000-0000-0000-0002-000000000002',
+    defaultName: 'صيدلية الشفاء والعافية',
+  },
+  clothing: {
+    storeId: '00000000-0000-0000-0003-000000000001',
+    branchId: '00000000-0000-0000-0003-000000000002',
+    defaultName: 'بوتيك الأناقة للملابس والموضة',
+  },
+  restaurant: {
+    storeId: '00000000-0000-0000-0004-000000000001',
+    branchId: '00000000-0000-0000-0004-000000000002',
+    defaultName: 'مطعم وكافيه الشرق',
+  },
+  general: {
+    storeId: '00000000-0000-0000-0005-000000000001',
+    branchId: '00000000-0000-0000-0005-000000000002',
+    defaultName: 'مؤسسة التجارة العامة والتوريدات',
+  },
+};
+
+export function getTenantInfo(businessType: BusinessType) {
+  return TENANT_STORE_MAP[businessType] || TENANT_STORE_MAP.supermarket;
+}
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 

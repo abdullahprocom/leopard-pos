@@ -21,7 +21,8 @@ export default function EditItemPage() {
   const router = useRouter()
   const params = useParams()
   const itemId = params?.id as string
-  const { businessType, isPharma, isSupermarket, isClothing } = useStore()
+  const { businessType, isPharma, isSupermarket, isClothing, storeId } = useStore()
+  const currentStoreId = storeId || DEFAULT_STORE_UUID
 
   // Basic info
   const [name, setName] = useState('')
@@ -53,17 +54,17 @@ export default function EditItemPage() {
   const [buyPrice, setBuyPrice] = useState('0')
   const [sellPrice, setSellPrice] = useState('0')
   const [minSellPrice, setMinSellPrice] = useState('0')
-  const [originalBuyPrice, setOriginalBuyPrice] = useState(0)
-  const [originalSellPrice, setOriginalSellPrice] = useState(0)
+  const [originalBuyPrice, setOriginalBuyPrice] = useState<number>(0)
+  const [originalSellPrice, setOriginalSellPrice] = useState<number>(0)
 
   // Barcodes
-  const [barcodes, setBarcodes] = useState<{ barcode: string; is_primary: boolean }[]>([
+  const [barcodes, setBarcodes] = useState<{ id?: string; barcode: string; is_primary: boolean }[]>([
     { barcode: '', is_primary: true }
   ])
 
   // 🔄 Dynamic Units of Measure (UOM)
-  const [units, setUnits] = useState<{ level: number; unit_name: string; qty_in_parent: number; barcode: string; sell_price: string }[]>([
-    { level: 1, unit_name: 'قطعة', qty_in_parent: 1, barcode: '', sell_price: '' }
+  const [units, setUnits] = useState<{ id?: string; level: number; unit_name: string; qty_in_parent: number; barcode: string; sell_price: string }[]>([
+    { level: 1, unit_name: isSupermarket ? 'قطعة' : isPharma ? 'علبة' : 'قطعة', qty_in_parent: 1, barcode: '', sell_price: '' }
   ])
 
   // Inventory
@@ -76,12 +77,14 @@ export default function EditItemPage() {
 
   // Fetch categories & ensure defaults strictly isolated per store and business activity
   useEffect(() => {
-    ensureDefaultCategories(DEFAULT_STORE_UUID, businessType)
-  }, [businessType])
+    if (currentStoreId) {
+      ensureDefaultCategories(currentStoreId, businessType)
+    }
+  }, [currentStoreId, businessType])
 
   const categories = useLiveQuery(
-    () => db.categories.where('store_id').equals(DEFAULT_STORE_UUID).sortBy('sort_order'),
-    [businessType]
+    () => currentStoreId ? db.categories.where('store_id').equals(currentStoreId).sortBy('sort_order') : [],
+    [currentStoreId, businessType]
   ) || []
 
   // Fetch price history audit log for this item
@@ -277,7 +280,7 @@ export default function EditItemPage() {
       const unitNamesList = units.map(u => u.unit_name.trim())
       const searchText = `${name} ${nameEn} ${manufacturer} ${scientificName} ${activeIngredient} ${brand} ${size} ${color} ${allBarcodesList.join(' ')} ${unitNamesList.join(' ')}`.toLowerCase()
 
-      const storeId = DEFAULT_STORE_UUID
+      const storeId = currentStoreId
 
       const updatedItem = {
         id: itemId,

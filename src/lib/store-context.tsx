@@ -2,23 +2,23 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { BusinessType } from './types'
-import { DEFAULT_STORE_UUID, DEFAULT_BRANCH_UUID, DEFAULT_USER_UUID } from './sync-engine'
+import { DEFAULT_STORE_UUID, DEFAULT_BRANCH_UUID, DEFAULT_USER_UUID, getTenantInfo, TENANT_STORE_MAP } from './sync-engine'
 import { ensureDefaultCategories } from './db'
 
 interface StoreContextType {
-  storeId: string | null
-  branchId: string | null
-  userId: string | null
+  storeId: string
+  branchId: string
+  userId: string
   storeName: string
   businessType: BusinessType
   activationToken: string | null
   isActivated: boolean
   isOnline: boolean
-  setStoreId: (id: string | null) => void
-  setBranchId: (id: string | null) => void
-  setUserId: (id: string | null) => void
+  setStoreId: (id: string) => void
+  setBranchId: (id: string) => void
+  setUserId: (id: string) => void
   setStoreName: (name: string) => void
-  setBusinessType: (type: BusinessType) => void
+  setBusinessType: (type: BusinessType) => Promise<void>
   purgeAndReseedCategories: (type?: BusinessType) => Promise<void>
   activateOfflineSystem: (token: string, name?: string, type?: BusinessType) => void
   // Convenient profile helpers
@@ -30,10 +30,11 @@ interface StoreContextType {
 const StoreContext = createContext<StoreContextType | undefined>(undefined)
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [storeId, setStoreId] = useState<string | null>(DEFAULT_STORE_UUID)
-  const [branchId, setBranchId] = useState<string | null>(DEFAULT_BRANCH_UUID)
-  const [userId, setUserId] = useState<string | null>(DEFAULT_USER_UUID)
-  const [storeName, setStoreNameState] = useState<string>('ERP Supermarket')
+  const defaultTenant = getTenantInfo('supermarket')
+  const [storeId, setStoreId] = useState<string>(defaultTenant.storeId)
+  const [branchId, setBranchId] = useState<string>(defaultTenant.branchId)
+  const [userId, setUserId] = useState<string>(DEFAULT_USER_UUID)
+  const [storeName, setStoreNameState] = useState<string>(defaultTenant.defaultName)
   const [businessType, setBusinessTypeState] = useState<BusinessType>('supermarket')
   const [activationToken, setActivationToken] = useState<string | null>(null)
   const [isActivated, setIsActivated] = useState<boolean>(true)
@@ -52,14 +53,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // 2. Load stored business profile & activation token from localStorage
     if (typeof window !== 'undefined') {
       const savedType = (localStorage.getItem('erp_business_type') || localStorage.getItem('apr_business_type')) as BusinessType | null
-      if (savedType) {
-        setBusinessTypeState(savedType)
-      }
+      const initialType: BusinessType = savedType || 'supermarket'
+      const tenant = getTenantInfo(initialType)
 
-      const savedName = localStorage.getItem('erp_store_name') || localStorage.getItem('apr_store_name')
-      if (savedName) {
-        setStoreNameState(savedName)
-      }
+      setBusinessTypeState(initialType)
+      setStoreId(tenant.storeId)
+      setBranchId(tenant.branchId)
+
+      const savedName = localStorage.getItem(`erp_store_name_${initialType}`) || localStorage.getItem('erp_store_name') || tenant.defaultName
+      setStoreNameState(savedName)
 
       const savedToken = localStorage.getItem('erp_activation_token') || localStorage.getItem('apr_activation_token')
       if (savedToken) {
@@ -73,9 +75,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setIsActivated(true)
       }
 
-      // 3. Ensure default categories for the loaded business profile
-      const currentType = savedType || 'supermarket'
-      ensureDefaultCategories(DEFAULT_STORE_UUID, currentType)
+      // 3. Ensure default categories for the isolated tenant store
+      ensureDefaultCategories(tenant.storeId, initialType, false)
     }
 
     return () => {
@@ -85,22 +86,33 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const setBusinessType = async (type: BusinessType) => {
+    const tenant = getTenantInfo(type)
     setBusinessTypeState(type)
+    setStoreId(tenant.storeId)
+    setBranchId(tenant.branchId)
+
+    const savedName = (typeof window !== 'undefined' && localStorage.getItem(`erp_store_name_${type}`)) || tenant.defaultName
+    setStoreNameState(savedName)
+
     if (typeof window !== 'undefined') {
       localStorage.setItem('erp_business_type', type)
+      localStorage.setItem(`erp_store_name_${type}`, savedName)
     }
-    // Automatically purge mismatched categories and re-seed with the new profile
-    await ensureDefaultCategories(storeId || DEFAULT_STORE_UUID, type, true)
+
+    // Ensure categories exist strictly for this tenant store
+    await ensureDefaultCategories(tenant.storeId, type, false)
   }
 
   const purgeAndReseedCategories = async (type?: BusinessType) => {
     const targetType = type || businessType
-    await ensureDefaultCategories(storeId || DEFAULT_STORE_UUID, targetType, true)
+    const tenant = getTenantInfo(targetType)
+    await ensureDefaultCategories(tenant.storeId, targetType, true)
   }
 
   const setStoreName = (name: string) => {
     setStoreNameState(name)
     if (typeof window !== 'undefined') {
+      localStorage.setItem(`erp_store_name_${businessType}`, name)
       localStorage.setItem('erp_store_name', name)
     }
   }
@@ -110,14 +122,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setIsActivated(true)
     if (typeof window !== 'undefined') {
       localStorage.setItem('erp_activation_token', token)
-      if (name) {
-        setStoreNameState(name)
-        localStorage.setItem('erp_store_name', name)
-      }
       if (type) {
-        setBusinessTypeState(type)
-        localStorage.setItem('erp_business_type', type)
-        ensureDefaultCategories(storeId || DEFAULT_STORE_UUID, type, true)
+        setBusinessType(type)
+      }
+      if (name) {
+        setStoreName(name)
       }
     }
   }

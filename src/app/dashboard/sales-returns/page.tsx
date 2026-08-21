@@ -11,9 +11,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useStore } from '@/lib/store-context'
 import type { SalesReturn, SalesReturnLine, CashTransaction } from '@/lib/types'
 
 export default function SalesReturnsPage() {
+  const { storeId, branchId } = useStore()
+  const currentStoreId = storeId || DEFAULT_STORE_UUID
+  const currentBranchId = branchId || DEFAULT_BRANCH_UUID
+
   const [invoiceNumber, setInvoiceNumber] = useState('')
   const [invoiceSearchTerm, setInvoiceSearchTerm] = useState('')
   const [invoiceReturnQuantities, setInvoiceReturnQuantities] = useState<Record<string, number>>({})
@@ -23,28 +28,33 @@ export default function SalesReturnsPage() {
   const [freeReturnItems, setFreeReturnItems] = useState<any[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Search invoice
+  // Search invoice strictly for current store
   const currentInvoice = useLiveQuery(async () => {
     if (!invoiceSearchTerm) return null
-    const sale = await db.sales.where('invoice_number').equals(invoiceSearchTerm.trim()).first()
+    const sale = await db.sales
+      .where('store_id').equals(currentStoreId)
+      .and(s => s.invoice_number === invoiceSearchTerm.trim())
+      .first()
     if (!sale) return null
     const lines = await db.sale_lines.where('sale_id').equals(sale.id).toArray()
     return { sale, lines }
-  }, [invoiceSearchTerm])
+  }, [invoiceSearchTerm, currentStoreId])
 
-  // Search items for free return
+  // Search items for free return strictly for current store
   const searchResults = useLiveQuery(async () => {
     if (itemSearchTerm.length < 1) return []
     const q = itemSearchTerm.toLowerCase()
     return await db.items
+      .where('store_id').equals(currentStoreId)
       .filter(item => (item.search_text || item.name || '').toLowerCase().includes(q))
       .limit(6)
       .toArray()
-  }, [itemSearchTerm]) || []
+  }, [itemSearchTerm, currentStoreId]) || []
 
-  // List existing sales returns
+  // List existing sales returns strictly for current store
   const returnsList = useLiveQuery(
-    () => db.sales_returns.orderBy('created_at').reverse().toArray()
+    () => db.sales_returns.where('store_id').equals(currentStoreId).reverse().sortBy('created_at'),
+    [currentStoreId]
   ) || []
 
   const handleSearchInvoice = () => {
@@ -234,8 +244,8 @@ export default function SalesReturnsPage() {
       const now = new Date().toISOString()
       const returnNumber = generateReturnNumber('sale')
       const returnId = crypto.randomUUID()
-      const storeId = DEFAULT_STORE_UUID
-      const branchId = DEFAULT_BRANCH_UUID
+      const storeId = currentStoreId
+      const branchId = currentBranchId
 
       const totalRefund = money(freeReturnItems.reduce((sum, item) => sum + (item.return_qty * item.unit_price), 0))
 

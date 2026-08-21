@@ -6,9 +6,16 @@ import { db } from '@/lib/db'
 import { Plus, ClipboardCheck, ClipboardList, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
+import { useStore } from '@/lib/store-context'
+import { DEFAULT_STORE_UUID } from '@/lib/sync-engine'
+
 export default function StocktakingPage() {
+  const { storeId } = useStore()
+  const currentStoreId = storeId || DEFAULT_STORE_UUID
+
   const stocktakings = useLiveQuery(
-    () => db.stocktaking.orderBy('created_at').reverse().toArray()
+    () => db.stocktaking.where('store_id').equals(currentStoreId).reverse().sortBy('created_at'),
+    [currentStoreId]
   ) || []
 
   return (

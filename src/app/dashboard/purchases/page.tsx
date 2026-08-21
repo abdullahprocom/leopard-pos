@@ -9,13 +9,17 @@ import Link from 'next/link'
 import { Plus, Search, FileText, ShoppingBag, ArrowUpRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
+import { useStore } from '@/lib/store-context'
+import { DEFAULT_STORE_UUID } from '@/lib/sync-engine'
 
 export default function PurchasesPage() {
+  const { storeId } = useStore()
+  const currentStoreId = storeId || DEFAULT_STORE_UUID
   const [searchTerm, setSearchTerm] = useState('')
 
   const purchases = useLiveQuery(
-    () => db.purchases.orderBy('created_at').reverse().toArray()
+    () => db.purchases.where('store_id').equals(currentStoreId).reverse().sortBy('created_at'),
+    [currentStoreId]
   )
 
   const getStatusBadge = (status: string) => {

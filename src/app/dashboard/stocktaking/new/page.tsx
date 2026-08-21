@@ -21,16 +21,23 @@ import {
   TableRow,
 } from '@/components/ui/table'
 
+import { useStore } from '@/lib/store-context'
+import { DEFAULT_STORE_UUID, DEFAULT_BRANCH_UUID } from '@/lib/sync-engine'
+
 export default function NewStocktakingPage() {
   const router = useRouter()
+  const { storeId, branchId } = useStore()
+  const currentStoreId = storeId || DEFAULT_STORE_UUID
+  const currentBranchId = branchId || DEFAULT_BRANCH_UUID
+
   const [notes, setNotes] = useState('')
   const [actualCounts, setActualCounts] = useState<Record<string, number>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Fetch all items and current balances
+  // Fetch all items and current balances strictly for current store
   const itemsWithBalances = useLiveQuery(async () => {
-    const items = await db.items.where('status').equals('active').toArray()
-    const balances = await db.stock_balances.toArray()
+    const items = await db.items.where('store_id').equals(currentStoreId).filter(i => i.status === 'active').toArray()
+    const balances = await db.stock_balances.where('store_id').equals(currentStoreId).toArray()
     const balanceMap = new Map<string, number>()
     balances.forEach(b => balanceMap.set(b.item_id, (balanceMap.get(b.item_id) || 0) + b.quantity))
 
@@ -38,7 +45,7 @@ export default function NewStocktakingPage() {
       ...item,
       system_qty: balanceMap.get(item.id) || 0,
     }))
-  }, []) || []
+  }, [currentStoreId]) || []
 
   const handleCountChange = (itemId: string, val: number) => {
     setActualCounts(prev => ({
@@ -53,8 +60,8 @@ export default function NewStocktakingPage() {
       const stocktakingId = crypto.randomUUID()
       const now = new Date().toISOString()
       const stocktakingNumber = generateStocktakingNumber()
-      const storeId = 'default'
-      const branchId = 'default'
+      const storeId = currentStoreId
+      const branchId = currentBranchId
 
       const stocktakingRecord = {
         id: stocktakingId,

@@ -144,7 +144,7 @@ const groups: TileGroup[] = [
 ]
 
 export default function DashboardPage() {
-  const { storeId } = useStore()
+  const { storeId, storeName, businessType } = useStore()
   const currentStoreId = storeId || DEFAULT_STORE_UUID
 
   // ─── Live Queries strictly isolated by current store (Tenant Isolation) ───
@@ -274,7 +274,12 @@ export default function DashboardPage() {
       {/* ─── Header ─── */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-gradient-to-bl from-blue-600 via-indigo-600 to-purple-700 p-6 sm:p-8 rounded-2xl shadow-lg shadow-indigo-500/15 text-white">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">لوحة القيادة</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight">{storeName}</h1>
+            <span className="bg-white/20 text-white text-xs font-black px-3 py-1 rounded-full border border-white/30 backdrop-blur-sm shadow-xs">
+              {businessType === 'clothing' ? '👗 نشاط الملابس والأحذية' : businessType === 'pharmacy' ? '💊 نشاط الصيدلية' : businessType === 'supermarket' ? '🛒 نشاط السوبرماركت' : businessType === 'restaurant' ? '🍔 نشاط المطاعم' : '🏢 تجارة عامة'}
+            </span>
+          </div>
           <p className="text-blue-100 text-sm font-semibold mt-1 flex items-center gap-2">
             <Calendar className="w-4 h-4" />
             {new Date().toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}

@@ -6,9 +6,16 @@ import { db } from '@/lib/db'
 import { Plus, ArrowLeftRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
+import { useStore } from '@/lib/store-context'
+import { DEFAULT_STORE_UUID } from '@/lib/sync-engine'
+
 export default function TransfersPage() {
+  const { storeId } = useStore()
+  const currentStoreId = storeId || DEFAULT_STORE_UUID
+
   const transfers = useLiveQuery(
-    () => db.stock_transfers.orderBy('created_at').reverse().toArray()
+    () => db.stock_transfers.where('store_id').equals(currentStoreId).reverse().sortBy('created_at'),
+    [currentStoreId]
   ) || []
 
   return (

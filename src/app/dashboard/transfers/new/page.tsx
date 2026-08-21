@@ -22,6 +22,8 @@ import {
   TableRow,
 } from '@/components/ui/table'
 
+import { useStore } from '@/lib/store-context'
+
 interface TransferLineItem {
   id: string
   item_id: string
@@ -34,29 +36,34 @@ const WAREHOUSE_BRANCH_UUID = '00000000-0000-0000-0000-000000000004'
 
 export default function NewTransferPage() {
   const router = useRouter()
-  const [fromBranchId, setFromBranchId] = useState(DEFAULT_BRANCH_UUID)
+  const { storeId, branchId } = useStore()
+  const currentStoreId = storeId || DEFAULT_STORE_UUID
+  const currentBranchId = branchId || DEFAULT_BRANCH_UUID
+
+  const [fromBranchId, setFromBranchId] = useState(currentBranchId)
   const [toBranchId, setToBranchId] = useState(WAREHOUSE_BRANCH_UUID)
   const [notes, setNotes] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [lines, setLines] = useState<TransferLineItem[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Search items
+  // Search items strictly for current store
   const searchResults = useLiveQuery(async () => {
     if (searchTerm.length < 1) return []
     const q = searchTerm.toLowerCase()
     return await db.items
+      .where('store_id').equals(currentStoreId)
       .filter(item => (item.search_text || item.name || '').toLowerCase().includes(q))
       .limit(10)
       .toArray()
-  }, [searchTerm]) || []
+  }, [searchTerm, currentStoreId]) || []
 
   const handleAddItem = async (item: any) => {
     const existing = lines.find(l => l.item_id === item.id)
     if (existing) {
       setLines(lines.map(l => l.item_id === item.id ? { ...l, quantity: l.quantity + 1 } : l))
     } else {
-      const stock = await db.stock_balances.where({ item_id: item.id, branch_id: fromBranchId }).first()
+      const stock = await db.stock_balances.where({ store_id: currentStoreId, item_id: item.id, branch_id: fromBranchId }).first()
       const available = stock?.quantity || 0
 
       setLines([...lines, {
@@ -90,7 +97,7 @@ export default function NewTransferPage() {
       const transferId = crypto.randomUUID()
       const now = new Date().toISOString()
       const transferNumber = generateTransferNumber()
-      const storeId = DEFAULT_STORE_UUID
+      const storeId = currentStoreId
 
       const transferRecord = {
         id: transferId,

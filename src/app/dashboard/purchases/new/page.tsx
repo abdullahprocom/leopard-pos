@@ -23,6 +23,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { Purchase, PurchaseLine, PaymentStatus, PaymentMethod } from '@/lib/types'
 
+import { useStore } from '@/lib/store-context'
+import { DEFAULT_STORE_UUID, DEFAULT_BRANCH_UUID } from '@/lib/sync-engine'
+
 interface FormPurchaseLine {
   id: string
   item_id: string
@@ -36,6 +39,10 @@ interface FormPurchaseLine {
 
 export default function NewPurchasePage() {
   const router = useRouter()
+  const { storeId, branchId } = useStore()
+  const currentStoreId = storeId || DEFAULT_STORE_UUID
+  const currentBranchId = branchId || DEFAULT_BRANCH_UUID
+
   const [supplierName, setSupplierName] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [lines, setLines] = useState<FormPurchaseLine[]>([])
@@ -47,10 +54,11 @@ export default function NewPurchasePage() {
     if (searchTerm.length < 1) return []
     const q = searchTerm.toLowerCase()
     return await db.items
+      .where('store_id').equals(currentStoreId)
       .filter(item => (item.search_text || item.name || '').toLowerCase().includes(q))
       .limit(10)
       .toArray()
-  }, [searchTerm]) || []
+  }, [searchTerm, currentStoreId]) || []
 
   const handleAddItem = (item: any) => {
     const existingLine = lines.find(l => l.item_id === item.id)
@@ -103,8 +111,6 @@ export default function NewPurchasePage() {
       const purchaseId = crypto.randomUUID()
       const now = new Date().toISOString()
       const purchaseNumber = generatePurchaseNumber()
-      const storeId = 'default'
-      const branchId = 'default'
 
       let paymentStatus: PaymentStatus = 'unpaid'
       if (paidAmount >= totalAmount && totalAmount > 0) paymentStatus = 'paid'
@@ -112,8 +118,8 @@ export default function NewPurchasePage() {
 
       const purchase: Purchase = {
         id: purchaseId,
-        store_id: storeId,
-        branch_id: branchId,
+        store_id: currentStoreId,
+        branch_id: currentBranchId,
         supplier_id: undefined,
         purchase_number: purchaseNumber,
         supplier_name: supplierName.trim() || 'مورد عام',
@@ -141,7 +147,7 @@ export default function NewPurchasePage() {
         for (const line of lines) {
           const purchaseLine: PurchaseLine = {
             id: crypto.randomUUID(),
-            store_id: storeId,
+            store_id: currentStoreId,
             purchase_id: purchaseId,
             item_id: line.item_id,
             quantity: line.quantity,
@@ -161,17 +167,17 @@ export default function NewPurchasePage() {
           })
 
           // Adjust stock balance
-          const stock = await db.stock_balances.where({ store_id: storeId, item_id: line.item_id, branch_id: branchId }).first()
+          const stock = await db.stock_balances.where({ store_id: currentStoreId, item_id: line.item_id, branch_id: currentBranchId }).first()
           if (stock) {
-            await db.stock_balances.where({ store_id: storeId, item_id: line.item_id, branch_id: branchId }).modify({
+            await db.stock_balances.where({ store_id: currentStoreId, item_id: line.item_id, branch_id: currentBranchId }).modify({
               quantity: stock.quantity + line.quantity,
               updated_at: now,
             })
           } else {
             await db.stock_balances.add({
-              store_id: storeId,
+              store_id: currentStoreId,
               item_id: line.item_id,
-              branch_id: branchId,
+              branch_id: currentBranchId,
               quantity: line.quantity,
               updated_at: now,
             })
@@ -180,9 +186,9 @@ export default function NewPurchasePage() {
           // Stock ledger
           const ledger = {
             id: crypto.randomUUID(),
-            store_id: storeId,
+            store_id: currentStoreId,
             item_id: line.item_id,
-            branch_id: branchId,
+            branch_id: currentBranchId,
             movement_type: 'purchase' as const,
             direction: 'in' as const,
             quantity: line.quantity,
@@ -201,8 +207,8 @@ export default function NewPurchasePage() {
         if (paidAmount > 0) {
           const cashTx = {
             id: crypto.randomUUID(),
-            store_id: storeId,
-            branch_id: branchId,
+            store_id: currentStoreId,
+            branch_id: currentBranchId,
             transaction_type: 'purchase-payment',
             direction: 'out' as const,
             amount: paidAmount,
