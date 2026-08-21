@@ -82,13 +82,16 @@ export interface Item {
   image_url?: string
   search_text: string
   status: ItemStatus
-  // Pharmacy-specific fields (only visible/used if business_type === 'pharmacy')
+  // Pharmacy-specific fields (visible when business_type === 'pharmacy')
   scientific_name?: string
   active_ingredient?: string
   prescription_required?: boolean
-  // Clothing-specific fields
+  batch_number?: string
+  expiry_date?: string
+  // Clothing-specific fields (visible when business_type === 'clothing')
   size?: string
   color?: string
+  brand?: string
   created_at: string
   updated_at: string
 }

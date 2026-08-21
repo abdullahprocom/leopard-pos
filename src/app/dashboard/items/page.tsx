@@ -167,7 +167,22 @@ export default function ItemsPage() {
                               ⚖️ ميزان (كجم)
                             </span>
                           )}
+                          {item.prescription_required && (
+                            <span className="text-[10px] bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/80 px-2 py-0.5 rounded-md font-bold">
+                              💊 روشتة طبية
+                            </span>
+                          )}
+                          {(item.size || item.color) && (
+                            <span className="text-[10px] bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-800/80 px-2 py-0.5 rounded-md font-bold">
+                              👕 {[item.brand, item.size, item.color].filter(Boolean).join(' - ')}
+                            </span>
+                          )}
                         </div>
+                        {item.active_ingredient && (
+                          <div className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                            مادة فعالة: {item.active_ingredient}
+                          </div>
+                        )}
                         {item.name_en && (
                           <div className="text-[11px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">{item.name_en}</div>
                         )}

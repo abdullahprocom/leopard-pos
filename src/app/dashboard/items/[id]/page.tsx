@@ -5,13 +5,14 @@ import { useRouter, useParams } from 'next/navigation'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, ensureDefaultCategories } from '@/lib/db'
 import { syncEngine, DEFAULT_STORE_UUID, DEFAULT_BRANCH_UUID } from '@/lib/sync-engine'
+import { useStore } from '@/lib/store-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { ArrowRight, Plus, Trash2, Save, Scale, AlertCircle, FolderPlus, Check, X } from 'lucide-react'
+import { ArrowRight, Plus, Trash2, Save, Scale, AlertCircle, FolderPlus, Check, X, Pill, Shirt, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import type { ItemType, ItemStatus } from '@/lib/types'
 import { cleanPositivePrice, cleanPositiveQuantity, money } from '@/lib/finance'
@@ -20,6 +21,7 @@ export default function EditItemPage() {
   const router = useRouter()
   const params = useParams()
   const itemId = params?.id as string
+  const { businessType, isPharma, isSupermarket, isClothing } = useStore()
 
   // Basic info
   const [name, setName] = useState('')
@@ -35,6 +37,18 @@ export default function EditItemPage() {
   const [isAddingCategory, setIsAddingCategory] = useState(false)
   const [newCatName, setNewCatName] = useState('')
 
+  // 💊 Pharmacy fields
+  const [scientificName, setScientificName] = useState('')
+  const [activeIngredient, setActiveIngredient] = useState('')
+  const [batchNumber, setBatchNumber] = useState('')
+  const [expiryDate, setExpiryDate] = useState('')
+  const [prescriptionRequired, setPrescriptionRequired] = useState(false)
+
+  // 👕 Clothing fields
+  const [size, setSize] = useState('')
+  const [color, setColor] = useState('')
+  const [brand, setBrand] = useState('')
+
   // Pricing
   const [buyPrice, setBuyPrice] = useState('0')
   const [sellPrice, setSellPrice] = useState('0')
@@ -45,7 +59,7 @@ export default function EditItemPage() {
     { barcode: '', is_primary: true }
   ])
 
-  // Packing levels (Units)
+  // 🔄 Dynamic Units of Measure (UOM)
   const [units, setUnits] = useState<{ level: number; unit_name: string; qty_in_parent: number; barcode: string; sell_price: string }[]>([
     { level: 1, unit_name: 'قطعة', qty_in_parent: 1, barcode: '', sell_price: '' }
   ])
@@ -64,6 +78,18 @@ export default function EditItemPage() {
   }, [])
 
   const categories = useLiveQuery(() => db.categories.toArray(), []) || []
+
+  // Dynamic Suggestion Chips for Unit of Measure based on profile
+  const unitSuggestions = isSupermarket 
+    ? ['قطعة', 'كيلو جرام', 'جرام', 'باكت', 'شكارة', 'كرتونة', 'دستة', 'لتر', 'علبة']
+    : isPharma
+    ? ['علبة', 'شريط', 'قرص', 'أمبول', 'كبسولة', 'زجاجة', 'أنبوبة', 'باكت']
+    : isClothing
+    ? ['قطعة', 'طقم', 'دستة', 'كرتونة', 'زوج', 'عبوة']
+    : ['قطعة', 'علبة', 'كرتونة', 'كيلو جرام', 'لتر', 'دستة']
+
+  const clothingSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '38', '40', '42', '44', '46']
+  const clothingColors = ['أسود', 'أبيض', 'كحلي', 'أزرق', 'رمادي', 'بيج', 'أحمر', 'أخضر', 'بني', 'زيتي']
 
   // Load existing item data
   useEffect(() => {
@@ -90,6 +116,18 @@ export default function EditItemPage() {
         setMinSellPrice(String(item.min_sell_price || 0))
         setManageInventory(item.manage_inventory ?? true)
         setLowStockAlert(String(item.low_stock_alert || 5))
+
+        // Pharmacy
+        setScientificName(item.scientific_name || '')
+        setActiveIngredient(item.active_ingredient || '')
+        setBatchNumber(item.batch_number || '')
+        setExpiryDate(item.expiry_date || '')
+        setPrescriptionRequired(Boolean(item.prescription_required))
+
+        // Clothing
+        setSize(item.size || '')
+        setColor(item.color || '')
+        setBrand(item.brand || '')
 
         // Load barcodes
         const existingBarcodes = await db.item_barcodes.where('item_id').equals(itemId).toArray()
@@ -141,7 +179,8 @@ export default function EditItemPage() {
 
   const addUnit = () => {
     const newLevel = units.length + 1
-    setUnits([...units, { level: newLevel, unit_name: '', qty_in_parent: 1, barcode: '', sell_price: '' }])
+    const defaultName = newLevel === 2 ? 'باكت / كرتونة' : 'شكارة'
+    setUnits([...units, { level: newLevel, unit_name: defaultName, qty_in_parent: 10, barcode: '', sell_price: '' }])
   }
 
   const removeUnit = (index: number) => {
@@ -217,7 +256,7 @@ export default function EditItemPage() {
         if (u.barcode?.trim()) allBarcodesList.push(u.barcode.trim())
       })
       const unitNamesList = units.map(u => u.unit_name.trim())
-      const searchText = `${name} ${nameEn} ${manufacturer} ${allBarcodesList.join(' ')} ${unitNamesList.join(' ')}`.toLowerCase()
+      const searchText = `${name} ${nameEn} ${manufacturer} ${scientificName} ${activeIngredient} ${brand} ${size} ${color} ${allBarcodesList.join(' ')} ${unitNamesList.join(' ')}`.toLowerCase()
 
       const storeId = DEFAULT_STORE_UUID
 
@@ -240,6 +279,16 @@ export default function EditItemPage() {
         allow_decimal: allowDecimal,
         search_text: searchText,
         status: status,
+        // Pharmacy
+        scientific_name: isPharma && scientificName.trim() ? scientificName.trim() : undefined,
+        active_ingredient: isPharma && activeIngredient.trim() ? activeIngredient.trim() : undefined,
+        batch_number: isPharma && batchNumber.trim() ? batchNumber.trim() : undefined,
+        expiry_date: isPharma && expiryDate ? expiryDate : undefined,
+        prescription_required: isPharma ? prescriptionRequired : false,
+        // Clothing
+        size: isClothing && size.trim() ? size.trim() : undefined,
+        color: isClothing && color.trim() ? color.trim() : undefined,
+        brand: isClothing && brand.trim() ? brand.trim() : undefined,
         updated_at: now
       }
 
@@ -338,7 +387,7 @@ export default function EditItemPage() {
           </Button>
           <div>
             <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">تعديل المنتج: {name}</h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold">تعديل الأسعار والوحدات والباركودات</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold">تعديل الأسعار والمواصفات والوحدات والباركودات</p>
           </div>
         </div>
 
@@ -444,27 +493,148 @@ export default function EditItemPage() {
                   </Select>
                 </div>
 
-                {/* Decimal Scale Toggle */}
-                <div className="col-span-full flex items-center justify-between p-4 border border-blue-500/30 rounded-xl bg-blue-50/50 dark:bg-blue-950/20">
-                  <div className="space-y-1">
-                    <Label className="text-sm font-black flex items-center gap-2 text-blue-700 dark:text-blue-400">
-                      <Scale className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                      صنف ميزان ووزن بالجرامات (كجم)
-                    </Label>
-                    <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">للأجبان واللحوم والخضار: يتيح البيع بالجرام أو بالمبلغ المالي (مثال: بـ 10 ج)</p>
+                {/* Decimal Scale Toggle (Supermarket / General) */}
+                {(isSupermarket || businessType === 'general') && (
+                  <div className="col-span-full flex items-center justify-between p-4 border border-blue-500/30 rounded-xl bg-blue-50/50 dark:bg-blue-950/20">
+                    <div className="space-y-1">
+                      <Label className="text-sm font-black flex items-center gap-2 text-blue-700 dark:text-blue-400">
+                        <Scale className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                        صنف ميزان ووزن بالجرامات (كجم)
+                      </Label>
+                      <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">للأجبان واللحوم والخضار: يتيح البيع بالجرام أو بالمبلغ المالي (مثال: بـ 10 ج)</p>
+                    </div>
+                    <Switch checked={allowDecimal} onCheckedChange={setAllowDecimal} />
                   </div>
-                  <Switch checked={allowDecimal} onCheckedChange={setAllowDecimal} />
-                </div>
+                )}
               </div>
             </CardContent>
           </Card>
 
+          {/* 💊 Dynamic Profile Card: Pharmacy Specific Fields */}
+          {isPharma && (
+            <Card className="border-emerald-500/30 dark:border-emerald-800 bg-emerald-50/20 dark:bg-emerald-950/10 shadow-sm">
+              <CardHeader className="border-b border-emerald-100 dark:border-emerald-900/40 pb-4">
+                <CardTitle className="text-lg font-black text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+                  <Pill className="w-5 h-5 text-emerald-600" />
+                  المواصفات الصيدلانية والطبية
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-5 pt-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <Label className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">الاسم العلمي (Scientific Name)</Label>
+                    <Input value={scientificName} onChange={e => setScientificName(e.target.value)} placeholder="مثال: Paracetamol" className="h-12 bg-white dark:bg-slate-900 font-bold" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">المادة الفعالة والتركيز</Label>
+                    <Input value={activeIngredient} onChange={e => setActiveIngredient(e.target.value)} placeholder="مثال: Paracetamol 500mg" className="h-12 bg-white dark:bg-slate-900 font-bold" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">رقم التشغيلة (Batch Number)</Label>
+                    <Input value={batchNumber} onChange={e => setBatchNumber(e.target.value)} placeholder="مثال: B-9982" className="h-12 bg-white dark:bg-slate-900 font-mono font-bold" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">تاريخ انتهاء الصلاحية</Label>
+                    <Input type="date" value={expiryDate} onChange={e => setExpiryDate(e.target.value)} className="h-12 bg-white dark:bg-slate-900 font-mono font-bold" />
+                  </div>
+                  <div className="col-span-full flex items-center justify-between p-4 border border-emerald-200 dark:border-emerald-800 rounded-xl bg-white dark:bg-slate-900">
+                    <div className="space-y-0.5">
+                      <Label className="text-sm font-bold text-slate-900 dark:text-white">يتطلب روشتة طبية (Prescription Required)</Label>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">تنبيه الكاشير بضرورة وجود وصفة طبية لصرف هذا الدواء</p>
+                    </div>
+                    <Switch checked={prescriptionRequired} onCheckedChange={setPrescriptionRequired} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 👕 Dynamic Profile Card: Clothing & Apparel Specific Fields */}
+          {isClothing && (
+            <Card className="border-purple-500/30 dark:border-purple-800 bg-purple-50/20 dark:bg-purple-950/10 shadow-sm">
+              <CardHeader className="border-b border-purple-100 dark:border-purple-900/40 pb-4">
+                <CardTitle className="text-lg font-black text-purple-800 dark:text-purple-300 flex items-center gap-2">
+                  <Shirt className="w-5 h-5 text-purple-600" />
+                  مواصفات الملابس والموضة
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-5 pt-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <Label className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">الماركة / البراند (Brand)</Label>
+                    <Input value={brand} onChange={e => setBrand(e.target.value)} placeholder="مثال: Zara / Nike" className="h-12 bg-white dark:bg-slate-900 font-bold" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">المقاس (Size)</Label>
+                    <Input value={size} onChange={e => setSize(e.target.value)} placeholder="اكتب أو اختر مقاس..." className="h-12 bg-white dark:bg-slate-900 font-bold" />
+                    <div className="flex flex-wrap gap-1.5 pt-1.5">
+                      {clothingSizes.map(s => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => setSize(s)}
+                          className={`px-2.5 py-1 rounded-md text-xs font-bold border transition-colors cursor-pointer ${size === s ? 'bg-purple-600 text-white border-purple-600' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-purple-50'}`}
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">اللون (Color)</Label>
+                    <Input value={color} onChange={e => setColor(e.target.value)} placeholder="اكتب أو اختر لون..." className="h-12 bg-white dark:bg-slate-900 font-bold" />
+                    <div className="flex flex-wrap gap-1.5 pt-1.5">
+                      {clothingColors.map(c => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setColor(c)}
+                          className={`px-2.5 py-1 rounded-md text-xs font-bold border transition-colors cursor-pointer ${color === c ? 'bg-purple-600 text-white border-purple-600' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-purple-50'}`}
+                        >
+                          {c}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 🔄 Dynamic Units of Measure (UOM) Card */}
           <Card className="border-slate-200/90 dark:border-slate-800 shadow-sm">
             <CardHeader className="border-b border-slate-100 dark:border-slate-800/80 pb-4">
-              <CardTitle className="text-lg font-black text-slate-900 dark:text-white">مستويات التعبئة والوحدات</CardTitle>
-              <CardDescription className="text-slate-500 dark:text-slate-400 font-medium">وحدات القياس ومعامل التفكيك للمنتج</CardDescription>
+              <CardTitle className="text-lg font-black text-slate-900 dark:text-white">
+                ديناميكية وحدات القياس ومستويات التعبئة (Dynamic UOM)
+              </CardTitle>
+              <CardDescription className="text-slate-500 dark:text-slate-400 font-medium">
+                تحديد اسم أي وحدة قياس ومعامل التفكيك الرياضي (Conversion Factor)
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4 pt-6">
+            <CardContent className="space-y-5 pt-6">
+              {/* Quick suggestion unit chips */}
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-slate-500 dark:text-slate-400 block">اقتراحات سريعة لمسميات الوحدات (يمكنك كتابة أي اسم مخصص):</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {unitSuggestions.map(uName => (
+                    <button
+                      key={uName}
+                      type="button"
+                      onClick={() => {
+                        const newUnits = [...units]
+                        newUnits[0].unit_name = uName
+                        setUnits(newUnits)
+                      }}
+                      className="px-3 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-blue-100 hover:text-blue-700 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+                    >
+                      + {uName}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {units.map((unit, index) => (
                 <div key={index} className="flex flex-col sm:flex-row gap-4 p-4 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-800/30 relative">
                   {index > 0 && (
@@ -473,14 +643,25 @@ export default function EditItemPage() {
                     </Button>
                   )}
                   <div className="flex-1 space-y-2">
-                    <Label className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">اسم الوحدة (المستوى {unit.level})</Label>
-                    <Input placeholder="مثال: قطعة، كيلو جرام، باكت، شكارة، كرتونة" value={unit.unit_name} onChange={e => {
-                      const newUnits = [...units]; newUnits[index].unit_name = e.target.value; setUnits(newUnits)
-                    }} className="h-12 bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 font-bold" />
+                    <Label className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">
+                      {index === 0 ? 'اسم الوحدة الأساسية الصغرى (المستوى 1)' : `اسم الوحدة الأكبر (المستوى ${unit.level})`}
+                    </Label>
+                    <Input 
+                      placeholder="مثال: قطعة، كيلو جرام، علبة، شريط، باكت، شكارة..." 
+                      value={unit.unit_name} 
+                      onChange={e => {
+                        const newUnits = [...units]
+                        newUnits[index].unit_name = e.target.value
+                        setUnits(newUnits)
+                      }} 
+                      className="h-12 bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 font-bold" 
+                    />
                   </div>
                   {index > 0 && (
                     <div className="flex-1 space-y-2">
-                      <Label className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">يحتوي على كم {units[index - 1].unit_name || 'وحدة أصغر'}؟</Label>
+                      <Label className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">
+                        معامل التفكيك: كم {units[index - 1].unit_name || 'وحدة أصغر'} بداخل الـ {unit.unit_name || 'وحدة'}؟
+                      </Label>
                       <Input 
                         type="text" 
                         inputMode="numeric"
@@ -502,17 +683,31 @@ export default function EditItemPage() {
                     </div>
                   )}
                   <div className="flex-1 space-y-2">
-                    <Label className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">باركود الوحدة (اختياري)</Label>
+                    <Label className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">باركود خاص بالوحدة (اختياري)</Label>
                     <Input value={unit.barcode} onChange={e => {
                       const newUnits = [...units]; newUnits[index].barcode = e.target.value; setUnits(newUnits)
                     }} className="h-12 font-mono bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 font-bold" dir="ltr" />
                   </div>
                 </div>
               ))}
+
+              {/* Dynamic Mathematical Breakdown Banner */}
+              {units.length > 1 && (
+                <div className="p-3.5 bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/60 rounded-xl text-xs font-bold text-blue-900 dark:text-blue-300 space-y-1">
+                  <p className="flex items-center gap-1.5 font-black text-sm">
+                    <Sparkles className="w-4 h-4 text-blue-600" />
+                    المعادلة الرياضية للتفكيك:
+                  </p>
+                  <p>
+                    1 {units[units.length - 1].unit_name} = {units[units.length - 1].qty_in_parent} {units[units.length - 2].unit_name} (يعتمد النظام تلقائياً على معامل التحويل في قيود الصرف والبيع).
+                  </p>
+                </div>
+              )}
+
               {!allowDecimal && (
                 <Button type="button" variant="outline" onClick={addUnit} className="w-full h-12 border-slate-300 dark:border-slate-700 font-bold cursor-pointer">
                   <Plus className="ml-2 h-4 w-4" />
-                  إضافة مستوى تعبئة جديد (شكارة / كرتونة / باكت)
+                  إضافة مستوى تعبئة وتجزئة أعلى (شكارة / كرتونة / باكت / دستة)
                 </Button>
               )}
             </CardContent>
@@ -567,7 +762,7 @@ export default function EditItemPage() {
           <Card className="border-slate-200/90 dark:border-slate-800 shadow-sm">
             <CardHeader className="border-b border-slate-100 dark:border-slate-800/80 pb-4">
               <CardTitle className="text-lg font-black text-slate-900 dark:text-white">
-                التسعير {allowDecimal ? '(سعر الكيلوجرام)' : ''}
+                التسعير {allowDecimal ? '(سعر الكيلوجرام)' : `(سعر الـ ${units[0]?.unit_name || 'قطعة'})`}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 pt-6">
@@ -646,7 +841,7 @@ export default function EditItemPage() {
 
           <Card className="border-slate-200/90 dark:border-slate-800 shadow-sm">
             <CardHeader className="border-b border-slate-100 dark:border-slate-800/80 pb-4">
-              <CardTitle className="text-lg font-black text-slate-900 dark:text-white">الباركود</CardTitle>
+              <CardTitle className="text-lg font-black text-slate-900 dark:text-white">الباركود الدولي</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 pt-6">
               {barcodes.map((b, index) => (
@@ -676,7 +871,7 @@ export default function EditItemPage() {
         </div>
       </div>
 
-      {/* Clean In-Flow Bottom Action Bar (No giant blocking footer) */}
+      {/* Clean In-Flow Bottom Action Bar */}
       <div className="flex items-center justify-end gap-3 pt-6 border-t border-slate-200 dark:border-slate-800">
         <Button variant="outline" size="lg" className="h-12 px-6 text-sm font-bold border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer" onClick={() => router.push('/dashboard/items')} disabled={isSubmitting}>
           إلغاء
