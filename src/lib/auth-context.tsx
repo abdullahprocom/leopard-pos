@@ -184,8 +184,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
 
       if (matched) {
-        // Verify PIN or password
-        const validPass = (matched.pin_code && matched.pin_code === cleanPass) || cleanPass === '1234' || cleanPass === 'admin123'
+        // Verify PIN or password strictly
+        const validPass = matched.pin_code ? matched.pin_code === cleanPass : cleanPass === '1234'
         if (validPass) {
           const userRole = (matched.role_id as UserRole) || 'cashier'
           const user: AuthUser = {
