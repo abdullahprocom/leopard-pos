@@ -17,8 +17,8 @@ interface StoreContextType {
   setStoreId: (id: string) => void
   setBranchId: (id: string) => void
   setUserId: (id: string) => void
-  setStoreName: (name: string) => void
-  setBusinessType: (type: BusinessType) => Promise<void>
+  setStoreName: (name: string, type?: BusinessType) => void
+  setBusinessType: (type: BusinessType, customName?: string) => Promise<void>
   purgeAndReseedCategories: (type?: BusinessType) => Promise<void>
   activateOfflineSystem: (token: string, name?: string, type?: BusinessType) => void
   // Convenient profile helpers
@@ -60,8 +60,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setStoreId(tenant.storeId)
       setBranchId(tenant.branchId)
 
-      const savedName = localStorage.getItem(`erp_store_name_${initialType}`) || localStorage.getItem('erp_store_name') || tenant.defaultName
+      // Strict per-tenant store name (never crossover between different activities)
+      const savedName = localStorage.getItem(`erp_store_name_${initialType}`) || tenant.defaultName
       setStoreNameState(savedName)
+      localStorage.setItem(`erp_store_name_${initialType}`, savedName)
+      localStorage.removeItem('erp_store_name')
 
       const savedToken = localStorage.getItem('erp_activation_token') || localStorage.getItem('apr_activation_token')
       if (savedToken) {
@@ -85,18 +88,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const setBusinessType = async (type: BusinessType) => {
+  const setBusinessType = async (type: BusinessType, customName?: string) => {
     const tenant = getTenantInfo(type)
     setBusinessTypeState(type)
     setStoreId(tenant.storeId)
     setBranchId(tenant.branchId)
 
-    const savedName = (typeof window !== 'undefined' && localStorage.getItem(`erp_store_name_${type}`)) || tenant.defaultName
-    setStoreNameState(savedName)
+    const finalName = customName || (typeof window !== 'undefined' && localStorage.getItem(`erp_store_name_${type}`)) || tenant.defaultName
+    setStoreNameState(finalName)
 
     if (typeof window !== 'undefined') {
       localStorage.setItem('erp_business_type', type)
-      localStorage.setItem(`erp_store_name_${type}`, savedName)
+      localStorage.setItem(`erp_store_name_${type}`, finalName)
+      localStorage.removeItem('erp_store_name')
     }
 
     // Ensure categories exist strictly for this tenant store
@@ -109,11 +113,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     await ensureDefaultCategories(tenant.storeId, targetType, true)
   }
 
-  const setStoreName = (name: string) => {
+  const setStoreName = (name: string, type?: BusinessType) => {
+    const targetType = type || businessType
     setStoreNameState(name)
     if (typeof window !== 'undefined') {
-      localStorage.setItem(`erp_store_name_${businessType}`, name)
-      localStorage.setItem('erp_store_name', name)
+      localStorage.setItem(`erp_store_name_${targetType}`, name)
+      localStorage.removeItem('erp_store_name')
     }
   }
 
@@ -123,9 +128,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (typeof window !== 'undefined') {
       localStorage.setItem('erp_activation_token', token)
       if (type) {
-        setBusinessType(type)
-      }
-      if (name) {
+        setBusinessType(type, name)
+      } else if (name) {
         setStoreName(name)
       }
     }

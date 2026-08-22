@@ -29,13 +29,12 @@ export default function SettingsPage() {
     async function loadSettings() {
       const tenant = getTenantInfo(businessType)
       const store = await db.stores.where('id').equals(tenant.storeId).first()
-      if (store) {
-        setLocalStoreName(store.name || storeName)
-        setCurrency(store.currency || 'EGP')
-        setTaxRate(String(store.tax_rate || 0))
-      } else {
-        setLocalStoreName(storeName)
-      }
+      const currentName = store?.name || (typeof window !== 'undefined' && localStorage.getItem(`erp_store_name_${businessType}`)) || tenant.defaultName
+      setLocalStoreName(currentName)
+      setLocalBusinessType(businessType)
+      setCurrency(store?.currency || 'EGP')
+      setTaxRate(String(store?.tax_rate || 0))
+
       const savedPrinter = localStorage.getItem('apr_printer_size') || '80mm'
       const savedFooter = localStorage.getItem('apr_receipt_footer') || 'شكراً لزيارتكم - منظومة APR System'
       setPrinterPaperSize(savedPrinter)
@@ -60,11 +59,12 @@ export default function SettingsPage() {
       const tenant = getTenantInfo(localBusinessType)
       const existing = await db.stores.where('id').equals(tenant.storeId).first()
       const now = new Date().toISOString()
+      const finalName = localStoreName.trim() || tenant.defaultName
 
       const storeData = {
         id: tenant.storeId,
         owner_id: existing?.owner_id || DEFAULT_USER_UUID,
-        name: localStoreName.trim(),
+        name: finalName,
         business_type: localBusinessType,
         status: 'active' as const,
         currency,
@@ -77,8 +77,7 @@ export default function SettingsPage() {
       syncEngine.enqueueOperation('stores', 'UPDATE', storeData)
 
       // Update global context & local storage (dynamically switches active tenant store)
-      await setBusinessType(localBusinessType)
-      setStoreName(localStoreName.trim())
+      await setBusinessType(localBusinessType, finalName)
 
       // Save printer settings in localStorage
       localStorage.setItem('apr_printer_size', printerPaperSize)
@@ -86,10 +85,10 @@ export default function SettingsPage() {
 
       // Update activation token if modified
       if (inputToken.trim()) {
-        activateOfflineSystem(inputToken.trim(), localStoreName.trim(), localBusinessType)
+        activateOfflineSystem(inputToken.trim(), finalName, localBusinessType)
       }
 
-      toast.success('تم حفظ وتطبيق نشاط المتجر وعزل بياناته بنجاح')
+      toast.success('تم حفظ وتطبيق نشاط المتجر وتحديث الاسم وعزل البيانات بنجاح')
     } catch (err: any) {
       toast.error('حدث خطأ أثناء الحفظ: ' + err.message)
     } finally {
@@ -154,11 +153,12 @@ export default function SettingsPage() {
               <Label className="text-xs font-bold text-slate-600 dark:text-slate-300">طبيعة ونوع النشاط</Label>
               <Select 
                 value={localBusinessType} 
-                onValueChange={(val) => {
+                onValueChange={async (val) => {
                   const newType = val as BusinessType
                   setLocalBusinessType(newType)
                   const tenant = getTenantInfo(newType)
-                  const savedName = (typeof window !== 'undefined' && localStorage.getItem(`erp_store_name_${newType}`)) || tenant.defaultName
+                  const storeInDb = await db.stores.where('id').equals(tenant.storeId).first()
+                  const savedName = storeInDb?.name || (typeof window !== 'undefined' && localStorage.getItem(`erp_store_name_${newType}`)) || tenant.defaultName
                   setLocalStoreName(savedName)
                 }}
               >
