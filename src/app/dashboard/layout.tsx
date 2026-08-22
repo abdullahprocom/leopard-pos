@@ -325,8 +325,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        {/* Scrollable Content Container (Full Width & Height Fluid Workspace) */}
-        <main className="flex-1 overflow-y-auto w-full h-full relative bg-slate-50 dark:bg-slate-950 transition-colors">
+        {/* Scrollable Content Container (Comfortable 96-98% Fluid Workspace with 10px breathing margins) */}
+        <main className="flex-1 overflow-y-auto w-full h-full relative bg-slate-50 dark:bg-slate-950 transition-colors p-2.5 sm:p-3.5">
           <div className="w-full h-full">
             {hasAccess ? (
               children
