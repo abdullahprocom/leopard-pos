@@ -527,7 +527,11 @@ export default function EditItemPage() {
                   ) : (
                     <Select value={categoryId} onValueChange={setCategoryId}>
                       <SelectTrigger className="h-12 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 font-bold">
-                        <SelectValue placeholder="اختر التصنيف" />
+                        <SelectValue placeholder="اختر التصنيف">
+                          {categoryId === 'none'
+                            ? 'بدون تصنيف'
+                            : categories.find(c => c.id === categoryId)?.name || 'اختر التصنيف'}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent className="dark:bg-slate-900 dark:border-slate-800 max-h-60">
                         <SelectItem value="none">بدون تصنيف</SelectItem>

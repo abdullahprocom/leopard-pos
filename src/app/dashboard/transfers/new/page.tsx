@@ -232,10 +232,12 @@ export default function NewTransferPage() {
           <CardContent>
             <Select value={fromBranchId} onValueChange={setFromBranchId}>
               <SelectTrigger className="h-12 text-sm font-bold bg-slate-50/80 dark:bg-slate-800/80 rounded-xl">
-                <SelectValue />
+                <SelectValue placeholder="اختر الفرع المصدر">
+                  {fromBranchId === WAREHOUSE_BRANCH_UUID ? 'المستودع والمخزن المركزي' : 'الفرع الرئيسي / صالة البيع'}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent className="rounded-xl shadow-xl dark:bg-slate-900 dark:border-slate-800">
-                <SelectItem value={DEFAULT_BRANCH_UUID}>الفرع الرئيسي / صالة العرض</SelectItem>
+                <SelectItem value={currentBranchId}>الفرع الرئيسي / صالة البيع</SelectItem>
                 <SelectItem value={WAREHOUSE_BRANCH_UUID}>المستودع والمخزن المركزي</SelectItem>
               </SelectContent>
             </Select>
@@ -249,11 +251,13 @@ export default function NewTransferPage() {
           <CardContent>
             <Select value={toBranchId} onValueChange={setToBranchId}>
               <SelectTrigger className="h-12 text-sm font-bold bg-slate-50/80 dark:bg-slate-800/80 rounded-xl">
-                <SelectValue />
+                <SelectValue placeholder="اختر الفرع الوجهة">
+                  {toBranchId === currentBranchId ? 'الفرع الرئيسي / صالة البيع' : 'المستودع والمخزن المركزي'}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent className="rounded-xl shadow-xl dark:bg-slate-900 dark:border-slate-800">
                 <SelectItem value={WAREHOUSE_BRANCH_UUID}>المستودع والمخزن المركزي</SelectItem>
-                <SelectItem value={DEFAULT_BRANCH_UUID}>الفرع الرئيسي / صالة العرض</SelectItem>
+                <SelectItem value={currentBranchId}>الفرع الرئيسي / صالة البيع</SelectItem>
               </SelectContent>
             </Select>
           </CardContent>

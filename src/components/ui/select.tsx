@@ -67,9 +67,12 @@ export const SelectTrigger = React.forwardRef<HTMLButtonElement, SelectTriggerPr
 )
 SelectTrigger.displayName = 'SelectTrigger'
 
-export function SelectValue({ placeholder }: { placeholder?: string }) {
+export function SelectValue({ placeholder, children }: { placeholder?: string; children?: React.ReactNode }) {
   const context = React.useContext(SelectContext)
   if (!context) return null
+  if (children !== undefined && children !== null && children !== '') {
+    return <span>{children}</span>
+  }
   return <span>{context.value || placeholder || ''}</span>
 }
 

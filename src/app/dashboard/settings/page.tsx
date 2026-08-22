@@ -163,7 +163,12 @@ export default function SettingsPage() {
                 }}
               >
                 <SelectTrigger className="h-12 text-sm font-bold bg-slate-50/80 dark:bg-slate-800/80 rounded-xl">
-                  <SelectValue />
+                  <SelectValue placeholder="اختر نوع النشاط">
+                    {localBusinessType === 'supermarket' ? 'سوبر ماركت وبقالة (باركود متعدد + عبوات وتجزئة + ميزان)' :
+                     localBusinessType === 'pharmacy' ? 'صيدلية ومستلزمات طبية (المادة الفعالة وتواريخ الصلاحية)' :
+                     localBusinessType === 'clothing' ? 'محلات ملابس وأحذية (مقاسات وألوان)' :
+                     'تجارة عامة ومخازن (قطع ومخزون وسريال)'}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="rounded-xl shadow-xl dark:bg-slate-900 dark:border-slate-800">
                   <SelectItem value="supermarket">سوبر ماركت وبقالة (باركود متعدد + عبوات وتجزئة + ميزان)</SelectItem>

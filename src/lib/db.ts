@@ -122,7 +122,7 @@ class LeopardDatabase extends Dexie {
   constructor() {
     super('LeopardPOS')
 
-    this.version(3).stores({
+    this.version(4).stores({
       // Foundation
       stores: 'id, owner_id, created_at',
       branches: 'id, store_id, code, is_default, created_at',

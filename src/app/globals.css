@@ -83,4 +83,23 @@
   ::-webkit-scrollbar-thumb:hover {
     background: #475569;
   }
+
+  /* Horizontal Category Scrollbar */
+  .custom-scrollbar-horizontal::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  .custom-scrollbar-horizontal::-webkit-scrollbar-track {
+    background: rgba(30, 41, 59, 0.4);
+    border-radius: 9999px;
+  }
+
+  .custom-scrollbar-horizontal::-webkit-scrollbar-thumb {
+    background: #475569;
+    border-radius: 9999px;
+  }
+
+  .custom-scrollbar-horizontal::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+  }
 }

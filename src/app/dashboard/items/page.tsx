@@ -195,7 +195,7 @@ export default function ItemsPage() {
                         {item.category_id && (
                           <div className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700 px-2 py-0.5 rounded-md mt-1.5">
                             <Tag className="w-3 h-3 text-slate-400 dark:text-slate-500" />
-                            {categories.find(c => c.id === item.category_id)?.name}
+                            {categories.find(c => c.id === item.category_id)?.name || 'بدون تصنيف'}
                           </div>
                         )}
                       </td>

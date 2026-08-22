@@ -230,6 +230,7 @@ export default function NewItemPage() {
         db.items, 
         db.item_barcodes, 
         db.item_units, 
+        db.item_price_history,
         db.stock_balances, 
         db.stock_ledger, 
         db.sync_queue
@@ -459,7 +460,11 @@ export default function NewItemPage() {
                   ) : (
                     <Select value={categoryId} onValueChange={setCategoryId}>
                       <SelectTrigger className="h-12 bg-slate-50 dark:bg-slate-900/90 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 font-bold">
-                        <SelectValue placeholder="اختر التصنيف" />
+                        <SelectValue placeholder="اختر التصنيف">
+                          {categoryId === 'none'
+                            ? 'بدون تصنيف'
+                            : categories.find(c => c.id === categoryId)?.name || 'اختر التصنيف'}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent className="dark:bg-slate-900 dark:border-slate-800 max-h-60">
                         <SelectItem value="none">بدون تصنيف</SelectItem>
