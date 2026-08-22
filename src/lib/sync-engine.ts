@@ -54,6 +54,10 @@ function isValidUUID(str: any): boolean {
   return UUID_REGEX.test(str) || str.startsWith('00000000-0000-0000-0000-');
 }
 
+const isCloudConfigured = typeof process !== 'undefined' && 
+  Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) && 
+  !process.env.NEXT_PUBLIC_SUPABASE_URL?.includes('placeholder');
+
 class SyncEngine {
   private isSyncing = false;
   private autoSyncInterval: ReturnType<typeof setInterval> | null = null;
@@ -64,12 +68,14 @@ class SyncEngine {
    * Add an operation to the local Dexie queue and trigger sync if online.
    */
   async enqueueOperation(tableName: string, action: 'INSERT' | 'UPDATE' | 'DELETE', payload: any) {
+    const isCloud = isCloudConfigured;
     const operation = {
       id: crypto.randomUUID(),
       table_name: tableName,
       action,
       payload,
-      status: 'pending',
+      status: isCloud ? 'pending' : 'synced',
+      synced_at: isCloud ? undefined : new Date().toISOString(),
       retry_count: 0,
       created_at: new Date().toISOString(),
     };
@@ -85,7 +91,7 @@ class SyncEngine {
     
     this.emitStatus();
     
-    if (typeof navigator !== 'undefined' && navigator.onLine) {
+    if (isCloud && typeof navigator !== 'undefined' && navigator.onLine) {
       // Defer execution slightly to avoid blocking UI rendering
       setTimeout(() => this.processQueue(), 50);
     }
@@ -168,6 +174,20 @@ class SyncEngine {
    * Runs sequentially to maintain operation order.
    */
   async processQueue() {
+    if (!isCloudConfigured) {
+      // In offline/local environment, auto-resolve all pending & failed queue items
+      try {
+        await (db as any).sync_queue
+          .where('status')
+          .anyOf(['pending', 'failed'])
+          .modify({ status: 'synced', synced_at: new Date().toISOString(), error_message: undefined });
+      } catch {
+        // ignore
+      }
+      this.emitStatus();
+      return;
+    }
+
     if (this.isSyncing || (typeof navigator !== 'undefined' && !navigator.onLine)) return;
     this.isSyncing = true;
 
@@ -263,10 +283,22 @@ class SyncEngine {
    */
   async clearFailedOperations() {
     try {
-      await (db as any).sync_queue.where('status').equals('failed').delete();
+      await (db as any).sync_queue.where('status').anyOf(['failed', 'pending']).delete();
       this.emitStatus();
     } catch (e) {
       console.warn('[SyncEngine] clearFailed error:', e);
+    }
+  }
+
+  /**
+   * Clear entire sync queue
+   */
+  async clearAllOperations() {
+    try {
+      await (db as any).sync_queue.clear();
+      this.emitStatus();
+    } catch (e) {
+      console.warn('[SyncEngine] clearAll error:', e);
     }
   }
 

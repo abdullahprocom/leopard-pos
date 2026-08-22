@@ -42,6 +42,11 @@ export default function SettingsPage() {
       
       const status = await syncEngine.getSyncStatus()
       setSyncStatus(status)
+      if (status.failed > 0 || status.pending > 0) {
+        await syncEngine.processQueue()
+        const refreshedStatus = await syncEngine.getSyncStatus()
+        setSyncStatus(refreshedStatus)
+      }
     }
     loadSettings()
 
@@ -97,18 +102,18 @@ export default function SettingsPage() {
   }
 
   const handleManualSync = async () => {
-    toast.info('جاري فحص المزامنة مع السحابة...')
+    toast.info('جاري فحص المزامنة المحلية وتصفية الطابور...')
     await syncEngine.processQueue()
     const status = await syncEngine.getSyncStatus()
     setSyncStatus(status)
-    toast.success('تم الانتهاء من المزامنة بنجاح')
+    toast.success('تم الانتهاء من فحص وتصفية المزامنة بنجاح')
   }
 
   const handleClearFailed = async () => {
-    await syncEngine.clearFailedOperations()
+    await syncEngine.clearAllOperations()
     const status = await syncEngine.getSyncStatus()
     setSyncStatus(status)
-    toast.success('تم تنظيف طابور العمليات العالقة بنجاح')
+    toast.success('تم مسح وتنظيف طابور العمليات بنجاح')
   }
 
   return (
@@ -221,7 +226,20 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-slate-600 dark:text-slate-300">اسم المنشأة / المحل</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-bold text-slate-600 dark:text-slate-300">اسم المنشأة / المحل</Label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const defaultName = getTenantInfo(localBusinessType).defaultName
+                    setLocalStoreName(defaultName)
+                    toast.info(`تم استعادة الاسم الافتراضي: ${defaultName}`)
+                  }}
+                  className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                >
+                  استعادة الاسم الافتراضي
+                </button>
+              </div>
               <Input 
                 value={localStoreName} 
                 onChange={e => setLocalStoreName(e.target.value)} 

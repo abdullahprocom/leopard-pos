@@ -29,6 +29,33 @@ interface StoreContextType {
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined)
 
+function sanitizeStoreName(type: BusinessType, rawName?: string | null): string {
+  const tenant = getTenantInfo(type)
+  if (!rawName || typeof rawName !== 'string' || !rawName.trim()) {
+    return tenant.defaultName
+  }
+  const clean = rawName.trim()
+  
+  // Guard against legacy cross-tenant name bleed
+  if (type === 'pharmacy' && (clean.includes('ملابس') || clean.includes('بوتيك') || clean.includes('سوبر ماركت'))) {
+    return tenant.defaultName
+  }
+  if (type === 'clothing' && (clean.includes('صيدلية') || clean.includes('سوبر ماركت') || clean.includes('ماركت'))) {
+    return tenant.defaultName
+  }
+  if (type === 'supermarket' && (clean.includes('صيدلية') || clean.includes('ملابس') || clean.includes('بوتيك'))) {
+    return tenant.defaultName
+  }
+  if (type === 'restaurant' && (clean.includes('صيدلية') || clean.includes('ملابس') || clean.includes('بوتيك'))) {
+    return tenant.defaultName
+  }
+  if (type === 'general' && (clean.includes('صيدلية') || clean.includes('ملابس') || clean.includes('بوتيك') || clean.includes('سوبر ماركت'))) {
+    return tenant.defaultName
+  }
+
+  return clean
+}
+
 export function StoreProvider({ children }: { children: ReactNode }) {
   const defaultTenant = getTenantInfo('supermarket')
   const [storeId, setStoreId] = useState<string>(defaultTenant.storeId)
@@ -60,10 +87,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setStoreId(tenant.storeId)
       setBranchId(tenant.branchId)
 
-      // Strict per-tenant store name (never crossover between different activities)
-      const savedName = localStorage.getItem(`erp_store_name_${initialType}`) || tenant.defaultName
-      setStoreNameState(savedName)
-      localStorage.setItem(`erp_store_name_${initialType}`, savedName)
+      // Strict per-tenant store name with self-healing validator
+      const rawStoredName = localStorage.getItem(`erp_store_name_${initialType}`)
+      const cleanName = sanitizeStoreName(initialType, rawStoredName)
+      setStoreNameState(cleanName)
+      localStorage.setItem(`erp_store_name_${initialType}`, cleanName)
       localStorage.removeItem('erp_store_name')
 
       const savedToken = localStorage.getItem('erp_activation_token') || localStorage.getItem('apr_activation_token')
@@ -94,7 +122,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setStoreId(tenant.storeId)
     setBranchId(tenant.branchId)
 
-    const finalName = customName || (typeof window !== 'undefined' && localStorage.getItem(`erp_store_name_${type}`)) || tenant.defaultName
+    const rawName = customName || (typeof window !== 'undefined' ? localStorage.getItem(`erp_store_name_${type}`) : null)
+    const finalName = sanitizeStoreName(type, rawName)
     setStoreNameState(finalName)
 
     if (typeof window !== 'undefined') {
@@ -115,9 +144,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const setStoreName = (name: string, type?: BusinessType) => {
     const targetType = type || businessType
-    setStoreNameState(name)
+    const clean = sanitizeStoreName(targetType, name)
+    setStoreNameState(clean)
     if (typeof window !== 'undefined') {
-      localStorage.setItem(`erp_store_name_${targetType}`, name)
+      localStorage.setItem(`erp_store_name_${targetType}`, clean)
       localStorage.removeItem('erp_store_name')
     }
   }
