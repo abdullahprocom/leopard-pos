@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { db } from '@/lib/db'
+import type { Employee } from '@/lib/types'
 
 export type UserRole = 'admin' | 'supervisor' | 'cashier'
 
@@ -88,6 +89,7 @@ interface AuthContextType {
   role: UserRole
   roleLabel: string
   login: (identifier: string, pass: string) => Promise<{ success: boolean; error?: string }>
+  registerAdmin: (name: string, email: string, pass: string) => Promise<{ success: boolean; error?: string }>
   logout: () => void
   canAccess: (pathname: string) => boolean
   isAdmin: boolean
@@ -103,12 +105,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Seed default admin in Dexie if not present
+  // Check active session in localStorage
   useEffect(() => {
     async function initAuth() {
       try {
         if (typeof window !== 'undefined') {
-          // Check active session in localStorage
           const savedSession = localStorage.getItem('erp_auth_session')
           if (savedSession) {
             try {
@@ -144,7 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const cleanPass = pass.trim()
 
     if (!cleanId || !cleanPass) {
-      return { success: false, error: 'يرجى إدخال اسم المستخدم / البريد وكلمة المرور' }
+      return { success: false, error: 'يرجى إدخال البريد الإلكتروني أو اسم المستخدم وكلمة المرور' }
     }
 
     try {
@@ -198,9 +199,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      return { success: false, error: 'بيانات الدخول غير صحيحة، تأكد من البريد أو اسم المستخدم وكلمة المرور' }
+      return { success: false, error: 'بيانات الدخول غير صحيحة، يرجى التأكد من البريد وكلمة المرور' }
     } catch (err: any) {
-      return { success: false, error: 'حدث خطأ أثناء التحقق من البيانات: ' + err.message }
+      return { success: false, error: 'حدث خطأ أثناء التحقق: ' + err.message }
+    }
+  }
+
+  const registerAdmin = async (name: string, email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const cleanName = name.trim()
+      const cleanEmail = email.trim().toLowerCase()
+      const cleanPass = pass.trim()
+
+      if (!cleanName || !cleanEmail || !cleanPass) {
+        return { success: false, error: 'يرجى ملء جميع الحقول المطلوبة' }
+      }
+
+      const existing = await db.employees.where('email').equals(cleanEmail).first()
+      if (existing) {
+        return { success: false, error: 'هذا البريد الإلكتروني مسجل بالفعل' }
+      }
+
+      const newAdmin: Employee = {
+        id: crypto.randomUUID(),
+        store_id: '00000000-0000-0000-0001-000000000001',
+        name: cleanName,
+        email: cleanEmail,
+        role_id: 'admin',
+        pin_code: cleanPass,
+        status: 'active',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+
+      await db.employees.add(newAdmin)
+
+      const user: AuthUser = {
+        id: newAdmin.id,
+        name: newAdmin.name,
+        email: newAdmin.email || cleanEmail,
+        role: 'admin',
+        branchName: 'الإدارة المركزية',
+      }
+
+      setCurrentUser(user)
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('erp_auth_session', JSON.stringify(user))
+      }
+      return { success: true }
+    } catch (err: any) {
+      return { success: false, error: 'فشل إنشاء الحساب: ' + err.message }
     }
   }
 
@@ -228,6 +276,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role: currentRole,
         roleLabel: ROLE_PERMISSIONS[currentRole]?.label || 'مستخدم',
         login,
+        registerAdmin,
         logout,
         canAccess,
         isAdmin: currentRole === 'admin',
