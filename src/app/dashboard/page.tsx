@@ -530,14 +530,14 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ─── 3. Solid Category Color-Coded Panels (Role Protected) ─── */}
-      <div className="space-y-4 pt-2">
-        <h2 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-          <Layers className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+      {/* ─── 3. Solid Category Color-Coded Panels (Role Protected & High-Impact Typography) ─── */}
+      <div className="space-y-5 pt-4">
+        <h2 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2.5">
+          <Layers className="w-6 h-6 text-blue-600 dark:text-blue-400" />
           {role === 'cashier' ? 'الوصول السريع لعمليات البيع (الكاشير)' : 'لوحة العمليات والأقسام الرئيسية'}
         </h2>
 
-        <div className={`grid gap-5 items-start ${
+        <div className={`grid gap-6 items-start ${
           role === 'cashier' 
             ? 'grid-cols-1 max-w-xl' 
             : role === 'supervisor' 
@@ -546,13 +546,13 @@ export default function DashboardPage() {
         }`}>
           
           {/* Panel 1: المبيعات (Magenta Pink) - All Roles */}
-          <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-base font-black text-white flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-pink-500 shadow-md shadow-pink-500/50" />
+          <div className="bg-slate-900 border-2 border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3.5">
+              <h3 className="text-lg font-black text-white flex items-center gap-2.5">
+                <div className="w-3.5 h-3.5 rounded-full bg-pink-500 shadow-lg shadow-pink-500/60 animate-pulse" />
                 المبيعات
               </h3>
-              <span className="text-[11px] font-bold text-pink-400 bg-pink-500/10 border border-pink-500/20 px-2.5 py-0.5 rounded-lg font-mono">
+              <span className="text-xs font-black text-pink-400 bg-pink-500/15 border border-pink-500/30 px-3 py-1 rounded-lg font-mono">
                 POS
               </span>
             </div>
@@ -560,60 +560,60 @@ export default function DashboardPage() {
             {/* Hero Button */}
             <Link
               href="/dashboard/pos"
-              className="flex flex-col items-center justify-center p-6 rounded-2xl bg-gradient-to-br from-[#d91e77] to-[#9d174d] hover:from-[#e11d7f] hover:to-[#be185d] text-white shadow-lg shadow-pink-600/30 transition-all duration-200 hover:-translate-y-1 active:scale-95 group text-center min-h-[140px] cursor-pointer"
+              className="flex flex-col items-center justify-center p-7 rounded-2xl bg-gradient-to-br from-[#d91e77] via-[#c01768] to-[#9d174d] hover:from-[#e11d7f] hover:to-[#be185d] text-white shadow-xl shadow-pink-600/40 transition-all duration-200 hover:-translate-y-1 active:scale-95 group text-center min-h-[165px] cursor-pointer"
             >
-              <div className="w-13 h-13 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center mb-2.5 group-hover:scale-110 transition-transform shadow-inner">
-                <ShoppingCart className="w-7 h-7 text-white" />
+              <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-inner ring-4 ring-white/10">
+                <ShoppingCart className="w-8 h-8 text-white" />
               </div>
-              <span className="text-lg font-black tracking-tight">نقطة البيع (الكاشير)</span>
-              <span className="text-xs font-bold text-pink-100 opacity-90 mt-0.5">فتح العملية (F2)</span>
+              <span className="text-xl font-black tracking-tight">نقطة البيع (الكاشير)</span>
+              <span className="text-xs font-black text-pink-100 opacity-95 mt-1 bg-black/20 px-3 py-0.5 rounded-full">فتح العملية (F2)</span>
             </Link>
 
             {/* Sub Grid 2x2 */}
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-2 gap-3">
               <Link
                 href="/dashboard/sales"
-                className="p-3.5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-center flex flex-col items-center justify-center gap-1.5 text-white transition-all hover:border-pink-500/50 group cursor-pointer"
+                className="p-4 min-h-[85px] bg-slate-800/90 hover:bg-slate-800 border-2 border-slate-700/60 rounded-2xl text-center flex flex-col items-center justify-center gap-2 text-white transition-all hover:border-pink-500/60 group cursor-pointer shadow-md active:scale-95"
               >
-                <BarChart3 className="w-5 h-5 text-pink-400 group-hover:scale-110 transition-transform" />
-                <span className="text-xs font-black">تقرير مبيعات</span>
+                <BarChart3 className="w-6 h-6 text-pink-400 group-hover:scale-110 transition-transform" />
+                <span className="text-sm font-black">تقرير مبيعات</span>
               </Link>
 
               <Link
                 href="/dashboard/sales-returns"
-                className="p-3.5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-center flex flex-col items-center justify-center gap-1.5 text-white transition-all hover:border-pink-500/50 group cursor-pointer"
+                className="p-4 min-h-[85px] bg-slate-800/90 hover:bg-slate-800 border-2 border-slate-700/60 rounded-2xl text-center flex flex-col items-center justify-center gap-2 text-white transition-all hover:border-pink-500/60 group cursor-pointer shadow-md active:scale-95"
               >
-                <RotateCcw className="w-5 h-5 text-pink-400 group-hover:scale-110 transition-transform" />
-                <span className="text-xs font-black">مرتجع بيع</span>
+                <RotateCcw className="w-6 h-6 text-pink-400 group-hover:scale-110 transition-transform" />
+                <span className="text-sm font-black">مرتجع بيع</span>
               </Link>
 
               <Link
                 href="/dashboard/quotations"
-                className="p-3.5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-center flex flex-col items-center justify-center gap-1.5 text-white transition-all hover:border-pink-500/50 group cursor-pointer"
+                className="p-4 min-h-[85px] bg-slate-800/90 hover:bg-slate-800 border-2 border-slate-700/60 rounded-2xl text-center flex flex-col items-center justify-center gap-2 text-white transition-all hover:border-pink-500/60 group cursor-pointer shadow-md active:scale-95"
               >
-                <FileSpreadsheet className="w-5 h-5 text-pink-400 group-hover:scale-110 transition-transform" />
-                <span className="text-xs font-black">عروض أسعار</span>
+                <FileSpreadsheet className="w-6 h-6 text-pink-400 group-hover:scale-110 transition-transform" />
+                <span className="text-sm font-black">عروض أسعار</span>
               </Link>
 
               <Link
                 href="/dashboard/customers"
-                className="p-3.5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-center flex flex-col items-center justify-center gap-1.5 text-white transition-all hover:border-pink-500/50 group cursor-pointer"
+                className="p-4 min-h-[85px] bg-slate-800/90 hover:bg-slate-800 border-2 border-slate-700/60 rounded-2xl text-center flex flex-col items-center justify-center gap-2 text-white transition-all hover:border-pink-500/60 group cursor-pointer shadow-md active:scale-95"
               >
-                <Users className="w-5 h-5 text-pink-400 group-hover:scale-110 transition-transform" />
-                <span className="text-xs font-black">العملاء</span>
+                <Users className="w-6 h-6 text-pink-400 group-hover:scale-110 transition-transform" />
+                <span className="text-sm font-black">العملاء</span>
               </Link>
             </div>
           </div>
 
           {/* Panel 2: المشتريات (Amber Orange) - Admin & Supervisor Only */}
           {(role === 'admin' || role === 'supervisor') && (
-            <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h3 className="text-base font-black text-white flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-amber-500 shadow-md shadow-amber-500/50" />
+            <div className="bg-slate-900 border-2 border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3.5">
+                <h3 className="text-lg font-black text-white flex items-center gap-2.5">
+                  <div className="w-3.5 h-3.5 rounded-full bg-amber-500 shadow-lg shadow-amber-500/60 animate-pulse" />
                   المشتريات
                 </h3>
-                <span className="text-[11px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded-lg font-mono">
+                <span className="text-xs font-black text-amber-400 bg-amber-500/15 border border-amber-500/30 px-3 py-1 rounded-lg font-mono">
                   PURCHASE
                 </span>
               </div>
@@ -621,47 +621,47 @@ export default function DashboardPage() {
               {/* Hero Button */}
               <Link
                 href="/dashboard/purchases/new"
-                className="flex flex-col items-center justify-center p-6 rounded-2xl bg-gradient-to-br from-[#d97706] to-[#b45309] hover:from-[#f59e0b] hover:to-[#d97706] text-white shadow-lg shadow-amber-600/30 transition-all duration-200 hover:-translate-y-1 active:scale-95 group text-center min-h-[140px] cursor-pointer"
+                className="flex flex-col items-center justify-center p-7 rounded-2xl bg-gradient-to-br from-[#d97706] via-[#b45309] to-[#92400e] hover:from-[#f59e0b] hover:to-[#d97706] text-white shadow-xl shadow-amber-600/40 transition-all duration-200 hover:-translate-y-1 active:scale-95 group text-center min-h-[165px] cursor-pointer"
               >
-                <div className="w-13 h-13 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center mb-2.5 group-hover:scale-110 transition-transform shadow-inner">
-                  <ShoppingBag className="w-7 h-7 text-white" />
+                <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-inner ring-4 ring-white/10">
+                  <ShoppingBag className="w-8 h-8 text-white" />
                 </div>
-                <span className="text-lg font-black tracking-tight">إضافة مشتريات</span>
-                <span className="text-xs font-bold text-amber-100 opacity-90 mt-0.5">تسجيل فاتورة شراء</span>
+                <span className="text-xl font-black tracking-tight">إضافة مشتريات</span>
+                <span className="text-xs font-black text-amber-100 opacity-95 mt-1 bg-black/20 px-3 py-0.5 rounded-full">تسجيل فاتورة شراء</span>
               </Link>
 
               {/* Sub Grid 2x2 */}
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 gap-3">
                 <Link
                   href="/dashboard/purchases"
-                  className="p-3.5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-center flex flex-col items-center justify-center gap-1.5 text-white transition-all hover:border-amber-500/50 group cursor-pointer"
+                  className="p-4 min-h-[85px] bg-slate-800/90 hover:bg-slate-800 border-2 border-slate-700/60 rounded-2xl text-center flex flex-col items-center justify-center gap-2 text-white transition-all hover:border-amber-500/60 group cursor-pointer shadow-md active:scale-95"
                 >
-                  <Receipt className="w-5 h-5 text-amber-400 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-black">فواتير الشراء</span>
+                  <Receipt className="w-6 h-6 text-amber-400 group-hover:scale-110 transition-transform" />
+                  <span className="text-sm font-black">فواتير الشراء</span>
                 </Link>
 
                 <Link
                   href="/dashboard/purchase-returns"
-                  className="p-3.5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-center flex flex-col items-center justify-center gap-1.5 text-white transition-all hover:border-amber-500/50 group cursor-pointer"
+                  className="p-4 min-h-[85px] bg-slate-800/90 hover:bg-slate-800 border-2 border-slate-700/60 rounded-2xl text-center flex flex-col items-center justify-center gap-2 text-white transition-all hover:border-amber-500/60 group cursor-pointer shadow-md active:scale-95"
                 >
-                  <Undo2 className="w-5 h-5 text-amber-400 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-black">مرتجع شراء</span>
+                  <Undo2 className="w-6 h-6 text-amber-400 group-hover:scale-110 transition-transform" />
+                  <span className="text-sm font-black">مرتجع شراء</span>
                 </Link>
 
                 <Link
                   href="/dashboard/suppliers"
-                  className="p-3.5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-center flex flex-col items-center justify-center gap-1.5 text-white transition-all hover:border-amber-500/50 group cursor-pointer"
+                  className="p-4 min-h-[85px] bg-slate-800/90 hover:bg-slate-800 border-2 border-slate-700/60 rounded-2xl text-center flex flex-col items-center justify-center gap-2 text-white transition-all hover:border-amber-500/60 group cursor-pointer shadow-md active:scale-95"
                 >
-                  <Building2 className="w-5 h-5 text-amber-400 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-black">الموردين</span>
+                  <Building2 className="w-6 h-6 text-amber-400 group-hover:scale-110 transition-transform" />
+                  <span className="text-sm font-black">الموردين</span>
                 </Link>
 
                 <Link
                   href="/dashboard/expenses"
-                  className="p-3.5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-center flex flex-col items-center justify-center gap-1.5 text-white transition-all hover:border-amber-500/50 group cursor-pointer"
+                  className="p-4 min-h-[85px] bg-slate-800/90 hover:bg-slate-800 border-2 border-slate-700/60 rounded-2xl text-center flex flex-col items-center justify-center gap-2 text-white transition-all hover:border-amber-500/60 group cursor-pointer shadow-md active:scale-95"
                 >
-                  <DollarSign className="w-5 h-5 text-amber-400 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-black">المصروفات</span>
+                  <DollarSign className="w-6 h-6 text-amber-400 group-hover:scale-110 transition-transform" />
+                  <span className="text-sm font-black">المصروفات</span>
                 </Link>
               </div>
             </div>
@@ -669,13 +669,13 @@ export default function DashboardPage() {
 
           {/* Panel 3: المخزون (Teal Emerald) - Admin & Supervisor Only */}
           {(role === 'admin' || role === 'supervisor') && (
-            <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h3 className="text-base font-black text-white flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-teal-500 shadow-md shadow-teal-500/50" />
+            <div className="bg-slate-900 border-2 border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3.5">
+                <h3 className="text-lg font-black text-white flex items-center gap-2.5">
+                  <div className="w-3.5 h-3.5 rounded-full bg-teal-500 shadow-lg shadow-teal-500/60 animate-pulse" />
                   المخزون
                 </h3>
-                <span className="text-[11px] font-bold text-teal-400 bg-teal-500/10 border border-teal-500/20 px-2.5 py-0.5 rounded-lg font-mono">
+                <span className="text-xs font-black text-teal-400 bg-teal-500/15 border border-teal-500/30 px-3 py-1 rounded-lg font-mono">
                   STOCK
                 </span>
               </div>
@@ -683,49 +683,49 @@ export default function DashboardPage() {
               {/* Hero Button */}
               <Link
                 href="/dashboard/items"
-                className="flex flex-col items-center justify-center p-6 rounded-2xl bg-gradient-to-br from-[#0d9488] to-[#115e59] hover:from-[#14b8a6] hover:to-[#0d9488] text-white shadow-lg shadow-teal-600/30 transition-all duration-200 hover:-translate-y-1 active:scale-95 group text-center min-h-[140px] cursor-pointer"
+                className="flex flex-col items-center justify-center p-7 rounded-2xl bg-gradient-to-br from-[#0d9488] via-[#0f766e] to-[#115e59] hover:from-[#14b8a6] hover:to-[#0d9488] text-white shadow-xl shadow-teal-600/40 transition-all duration-200 hover:-translate-y-1 active:scale-95 group text-center min-h-[165px] cursor-pointer"
               >
-                <div className="w-13 h-13 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center mb-2.5 group-hover:scale-110 transition-transform shadow-inner">
-                  <Package className="w-7 h-7 text-white" />
+                <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-inner ring-4 ring-white/10">
+                  <Package className="w-8 h-8 text-white" />
                 </div>
-                <span className="text-lg font-black tracking-tight">
+                <span className="text-xl font-black tracking-tight">
                   {businessType === 'pharmacy' ? 'الأدوية والمستلزمات' : 'الأصناف والمخزون'}
                 </span>
-                <span className="text-xs font-bold text-teal-100 opacity-90 mt-0.5">إدارة الكميات والأسعار</span>
+                <span className="text-xs font-black text-teal-100 opacity-95 mt-1 bg-black/20 px-3 py-0.5 rounded-full">إدارة الكميات والأسعار</span>
               </Link>
 
               {/* Sub Grid 2x2 */}
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 gap-3">
                 <Link
                   href="/dashboard/items/new"
-                  className="p-3.5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-center flex flex-col items-center justify-center gap-1.5 text-white transition-all hover:border-teal-500/50 group cursor-pointer"
+                  className="p-4 min-h-[85px] bg-slate-800/90 hover:bg-slate-800 border-2 border-slate-700/60 rounded-2xl text-center flex flex-col items-center justify-center gap-2 text-white transition-all hover:border-teal-500/60 group cursor-pointer shadow-md active:scale-95"
                 >
-                  <Package className="w-5 h-5 text-teal-400 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-black">إضافة صنف</span>
+                  <Package className="w-6 h-6 text-teal-400 group-hover:scale-110 transition-transform" />
+                  <span className="text-sm font-black">إضافة صنف</span>
                 </Link>
 
                 <Link
                   href="/dashboard/stocktaking"
-                  className="p-3.5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-center flex flex-col items-center justify-center gap-1.5 text-white transition-all hover:border-teal-500/50 group cursor-pointer"
+                  className="p-4 min-h-[85px] bg-slate-800/90 hover:bg-slate-800 border-2 border-slate-700/60 rounded-2xl text-center flex flex-col items-center justify-center gap-2 text-white transition-all hover:border-teal-500/60 group cursor-pointer shadow-md active:scale-95"
                 >
-                  <ClipboardList className="w-5 h-5 text-teal-400 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-black">حالة المخزون</span>
+                  <ClipboardList className="w-6 h-6 text-teal-400 group-hover:scale-110 transition-transform" />
+                  <span className="text-sm font-black">حالة المخزون</span>
                 </Link>
 
                 <Link
                   href="/dashboard/transfers"
-                  className="p-3.5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-center flex flex-col items-center justify-center gap-1.5 text-white transition-all hover:border-teal-500/50 group cursor-pointer"
+                  className="p-4 min-h-[85px] bg-slate-800/90 hover:bg-slate-800 border-2 border-slate-700/60 rounded-2xl text-center flex flex-col items-center justify-center gap-2 text-white transition-all hover:border-teal-500/60 group cursor-pointer shadow-md active:scale-95"
                 >
-                  <ArrowLeftRight className="w-5 h-5 text-teal-400 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-black">تحويل مخزون</span>
+                  <ArrowLeftRight className="w-6 h-6 text-teal-400 group-hover:scale-110 transition-transform" />
+                  <span className="text-sm font-black">تحويل مخزون</span>
                 </Link>
 
                 <Link
                   href="/dashboard/barcode-print"
-                  className="p-3.5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-center flex flex-col items-center justify-center gap-1.5 text-white transition-all hover:border-teal-500/50 group cursor-pointer"
+                  className="p-4 min-h-[85px] bg-slate-800/90 hover:bg-slate-800 border-2 border-slate-700/60 rounded-2xl text-center flex flex-col items-center justify-center gap-2 text-white transition-all hover:border-teal-500/60 group cursor-pointer shadow-md active:scale-95"
                 >
-                  <Tag className="w-5 h-5 text-teal-400 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-black">طباعة باركود</span>
+                  <Tag className="w-6 h-6 text-teal-400 group-hover:scale-110 transition-transform" />
+                  <span className="text-sm font-black">طباعة باركود</span>
                 </Link>
               </div>
             </div>
@@ -733,13 +733,13 @@ export default function DashboardPage() {
 
           {/* Panel 4: الشؤون الإدارية والمالية (Purple Indigo) - Admin Only */}
           {role === 'admin' && (
-            <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h3 className="text-base font-black text-white flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-purple-500 shadow-md shadow-purple-500/50" />
+            <div className="bg-slate-900 border-2 border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3.5">
+                <h3 className="text-lg font-black text-white flex items-center gap-2.5">
+                  <div className="w-3.5 h-3.5 rounded-full bg-purple-500 shadow-lg shadow-purple-500/60 animate-pulse" />
                   الشؤون الإدارية والمالية
                 </h3>
-                <span className="text-[11px] font-bold text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2.5 py-0.5 rounded-lg font-mono">
+                <span className="text-xs font-black text-purple-400 bg-purple-500/15 border border-purple-500/30 px-3 py-1 rounded-lg font-mono">
                   ADMIN
                 </span>
               </div>
@@ -747,47 +747,47 @@ export default function DashboardPage() {
               {/* Hero Button */}
               <Link
                 href="/dashboard/settings"
-                className="flex flex-col items-center justify-center p-6 rounded-2xl bg-gradient-to-br from-[#6366f1] to-[#4338ca] hover:from-[#818cf8] hover:to-[#6366f1] text-white shadow-lg shadow-indigo-600/30 transition-all duration-200 hover:-translate-y-1 active:scale-95 group text-center min-h-[140px] cursor-pointer"
+                className="flex flex-col items-center justify-center p-7 rounded-2xl bg-gradient-to-br from-[#6366f1] via-[#4f46e5] to-[#4338ca] hover:from-[#818cf8] hover:to-[#6366f1] text-white shadow-xl shadow-indigo-600/40 transition-all duration-200 hover:-translate-y-1 active:scale-95 group text-center min-h-[165px] cursor-pointer"
               >
-                <div className="w-13 h-13 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center mb-2.5 group-hover:scale-110 transition-transform shadow-inner">
-                  <Settings className="w-7 h-7 text-white" />
+                <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-inner ring-4 ring-white/10">
+                  <Settings className="w-8 h-8 text-white" />
                 </div>
-                <span className="text-lg font-black tracking-tight">الإعدادات</span>
-                <span className="text-xs font-bold text-indigo-100 opacity-90 mt-0.5">تخصيص النشاط والتهيئة</span>
+                <span className="text-xl font-black tracking-tight">الإعدادات</span>
+                <span className="text-xs font-black text-indigo-100 opacity-95 mt-1 bg-black/20 px-3 py-0.5 rounded-full">تخصيص النشاط والتهيئة</span>
               </Link>
 
               {/* Sub Grid 2x2 */}
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 gap-3">
                 <Link
                   href="/dashboard/employees"
-                  className="p-3.5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-center flex flex-col items-center justify-center gap-1.5 text-white transition-all hover:border-purple-500/50 group cursor-pointer"
+                  className="p-4 min-h-[85px] bg-slate-800/90 hover:bg-slate-800 border-2 border-slate-700/60 rounded-2xl text-center flex flex-col items-center justify-center gap-2 text-white transition-all hover:border-purple-500/60 group cursor-pointer shadow-md active:scale-95"
                 >
-                  <UserCog className="w-5 h-5 text-purple-400 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-black">المستخدمين</span>
+                  <UserCog className="w-6 h-6 text-purple-400 group-hover:scale-110 transition-transform" />
+                  <span className="text-sm font-black">المستخدمين</span>
                 </Link>
 
                 <Link
                   href="/dashboard/reports"
-                  className="p-3.5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-center flex flex-col items-center justify-center gap-1.5 text-white transition-all hover:border-purple-500/50 group cursor-pointer"
+                  className="p-4 min-h-[85px] bg-slate-800/90 hover:bg-slate-800 border-2 border-slate-700/60 rounded-2xl text-center flex flex-col items-center justify-center gap-2 text-white transition-all hover:border-purple-500/60 group cursor-pointer shadow-md active:scale-95"
                 >
-                  <BarChart3 className="w-5 h-5 text-purple-400 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-black">الأرباح والخسائر</span>
+                  <BarChart3 className="w-6 h-6 text-purple-400 group-hover:scale-110 transition-transform" />
+                  <span className="text-sm font-black">الأرباح والخسائر</span>
                 </Link>
 
                 <Link
                   href="/login"
-                  className="p-3.5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-center flex flex-col items-center justify-center gap-1.5 text-white transition-all hover:border-purple-500/50 group cursor-pointer"
+                  className="p-4 min-h-[85px] bg-slate-800/90 hover:bg-slate-800 border-2 border-slate-700/60 rounded-2xl text-center flex flex-col items-center justify-center gap-2 text-white transition-all hover:border-purple-500/60 group cursor-pointer shadow-md active:scale-95"
                 >
-                  <Crown className="w-5 h-5 text-purple-400 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-black">تبديل الحساب</span>
+                  <Crown className="w-6 h-6 text-purple-400 group-hover:scale-110 transition-transform" />
+                  <span className="text-sm font-black">تبديل الحساب</span>
                 </Link>
 
                 <Link
                   href="/dashboard/settings"
-                  className="p-3.5 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-center flex flex-col items-center justify-center gap-1.5 text-white transition-all hover:border-purple-500/50 group cursor-pointer"
+                  className="p-4 min-h-[85px] bg-slate-800/90 hover:bg-slate-800 border-2 border-slate-700/60 rounded-2xl text-center flex flex-col items-center justify-center gap-2 text-white transition-all hover:border-purple-500/60 group cursor-pointer shadow-md active:scale-95"
                 >
-                  <Activity className="w-5 h-5 text-purple-400 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-black">سجل النشاط</span>
+                  <Activity className="w-6 h-6 text-purple-400 group-hover:scale-110 transition-transform" />
+                  <span className="text-sm font-black">سجل النشاط</span>
                 </Link>
               </div>
             </div>

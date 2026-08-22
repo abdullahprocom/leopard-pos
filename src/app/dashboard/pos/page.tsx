@@ -464,76 +464,76 @@ export default function POSPage() {
     <div className="min-h-screen bg-[#070d18] text-white flex flex-col justify-between select-none" dir="rtl">
       
       {/* ─── 1. TOP HEADER & MULTI-ACTION TOOLBAR (Matches Image 1) ─── */}
-      <div className="bg-[#0b1528] border-b border-slate-800/80 px-4 py-2.5 flex flex-col gap-2.5 shadow-md">
+      <div className="bg-[#0b1528] border-b border-slate-800 px-5 py-3 flex flex-col gap-3 shadow-lg">
         
         {/* Row 1: App Controls + Navigation */}
-        <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center justify-between flex-wrap gap-3">
           
           {/* Right: Home Button & POS Title */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3.5">
             <Link
               href="/dashboard"
-              className="w-10 h-10 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white flex items-center justify-center shadow-md shadow-blue-600/30 transition-all cursor-pointer"
+              className="w-11 h-11 rounded-2xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white flex items-center justify-center shadow-lg shadow-blue-600/30 transition-all cursor-pointer hover:scale-105 active:scale-95"
               title="العودة للرئيسية"
             >
-              <Home className="w-5 h-5" />
+              <Home className="w-6 h-6" />
             </Link>
             <div>
-              <h1 className="text-lg font-black text-white tracking-tight">
+              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
                 نقطة البيع (الكاشير)
               </h1>
             </div>
           </div>
 
-          {/* Center: Action Buttons Row 1 (Solid Colored Pills) */}
-          <div className="flex items-center gap-2 flex-wrap">
+          {/* Center: Action Buttons Row 1 (Solid Colored Pills - Enriched Size & Weight) */}
+          <div className="flex items-center gap-2.5 flex-wrap">
             <button
               type="button"
               onClick={() => setExpenseModalOpen(true)}
-              className="px-3.5 py-1.5 rounded-xl bg-[#e11d48] hover:bg-[#be123c] text-white text-xs font-black flex items-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-[#e11d48] hover:bg-[#be123c] text-white text-xs sm:text-sm font-black flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer"
             >
-              <Receipt className="w-3.5 h-3.5" />
+              <Receipt className="w-4 h-4" />
               <span>إضافة مصروفات</span>
             </button>
 
             <button
               type="button"
               onClick={() => setInquiryModalOpen(true)}
-              className="px-3.5 py-1.5 rounded-xl bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-xs font-black flex items-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-xs sm:text-sm font-black flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer"
             >
-              <Info className="w-3.5 h-3.5" />
+              <Info className="w-4 h-4" />
               <span>استعلام أصناف (F3)</span>
             </button>
 
             <button
               type="button"
               onClick={() => setShowQuickItems(!showQuickItems)}
-              className={`px-3.5 py-1.5 rounded-xl text-white text-xs font-black flex items-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer ${
+              className={`px-4 py-2 rounded-xl text-white text-xs sm:text-sm font-black flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer ${
                 showQuickItems ? 'bg-amber-600 ring-2 ring-amber-400' : 'bg-[#d97706] hover:bg-[#b45309]'
               }`}
             >
-              <Layers className="w-3.5 h-3.5" />
+              <Layers className="w-4 h-4" />
               <span>أصناف سريعة</span>
             </button>
 
             <button
               type="button"
               onClick={() => setRecentSalesModalOpen(true)}
-              className="px-3.5 py-1.5 rounded-xl bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-xs font-black flex items-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-xs sm:text-sm font-black flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer"
             >
-              <Clock className="w-3.5 h-3.5" />
+              <Clock className="w-4 h-4" />
               <span>آخر العمليات</span>
             </button>
 
             <button
               type="button"
               onClick={() => setSuspendedModalOpen(true)}
-              className="px-3.5 py-1.5 rounded-xl bg-[#0d9488] hover:bg-[#0f766e] text-white text-xs font-black flex items-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer relative"
+              className="px-4 py-2 rounded-xl bg-[#0d9488] hover:bg-[#0f766e] text-white text-xs sm:text-sm font-black flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer relative"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <FileSpreadsheet className="w-4 h-4" />
               <span>مبيعات معلقة</span>
               {suspendedCarts.length > 0 && (
-                <span className="w-5 h-5 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center -mr-1">
+                <span className="w-5 h-5 rounded-full bg-rose-500 text-white text-xs font-black flex items-center justify-center -mr-1 animate-pulse">
                   {suspendedCarts.length}
                 </span>
               )}
@@ -541,53 +541,53 @@ export default function POSPage() {
 
             <Link
               href="/dashboard/sales-returns"
-              className="px-3.5 py-1.5 rounded-xl bg-[#059669] hover:bg-[#047857] text-white text-xs font-black flex items-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-[#059669] hover:bg-[#047857] text-white text-xs sm:text-sm font-black flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="w-4 h-4" />
               <span>مرتجع مبيعات</span>
             </Link>
 
             <Link
               href="/dashboard/purchase-returns"
-              className="px-3.5 py-1.5 rounded-xl bg-[#ea580c] hover:bg-[#c2410c] text-white text-xs font-black flex items-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-[#ea580c] hover:bg-[#c2410c] text-white text-xs sm:text-sm font-black flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer"
             >
-              <Undo2 className="w-3.5 h-3.5" />
+              <Undo2 className="w-4 h-4" />
               <span>مرتجع مشتريات</span>
             </Link>
 
             <button
               type="button"
               onClick={() => setShiftModalOpen(true)}
-              className="px-3.5 py-1.5 rounded-xl bg-[#db2777] hover:bg-[#be185d] text-white text-xs font-black flex items-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-[#db2777] hover:bg-[#be185d] text-white text-xs sm:text-sm font-black flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer"
             >
-              <Receipt className="w-3.5 h-3.5" />
+              <Receipt className="w-4 h-4" />
               <span>تفاصيل الجلسة</span>
             </button>
           </div>
 
           {/* Left: System Badges and Quick Shortcuts */}
-          <div className="flex items-center gap-2.5">
-            <div className="bg-slate-800/80 border border-slate-700/80 rounded-xl px-2.5 py-1.5 flex items-center gap-1.5 text-xs font-mono text-slate-300 font-bold">
-              <Calendar className="w-3.5 h-3.5 text-blue-400" />
+          <div className="flex items-center gap-3">
+            <div className="bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-2 flex items-center gap-2 text-xs sm:text-sm font-mono text-slate-200 font-black shadow-xs">
+              <Calendar className="w-4 h-4 text-blue-400" />
               <span>{todayDateFormatted}</span>
             </div>
 
             <button
               type="button"
               onClick={() => setCalculatorOpen(true)}
-              className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 flex items-center justify-center cursor-pointer transition-colors"
+              className="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 flex items-center justify-center cursor-pointer transition-all hover:scale-105 active:scale-95 shadow-xs"
               title="آلة حاسبة (F4)"
             >
-              <Calculator className="w-4 h-4 text-cyan-400" />
+              <Calculator className="w-5 h-5 text-cyan-400" />
             </button>
 
-            <div className="bg-emerald-950/60 border border-emerald-800 text-emerald-400 text-[11px] font-black px-2.5 py-1 rounded-full flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <div className="bg-emerald-950/80 border border-emerald-700 text-emerald-400 text-xs font-black px-3 py-1.5 rounded-full flex items-center gap-2 shadow-xs">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
               <span>متصل</span>
             </div>
 
             {/* User Badge */}
-            <div className="w-9 h-9 rounded-full bg-blue-600 text-white font-black text-sm flex items-center justify-center ring-2 ring-blue-400/40">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-700 to-indigo-600 text-white font-black text-base flex items-center justify-center ring-2 ring-blue-400/50 shadow-md">
               {currentUser?.name ? currentUser.name.charAt(0) : 'ع'}
             </div>
           </div>
@@ -595,31 +595,31 @@ export default function POSPage() {
         </div>
 
         {/* Row 2: Secondary Quick Actions Mini Row */}
-        <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-800/60">
+        <div className="flex items-center justify-end gap-2.5 pt-1.5 border-t border-slate-800">
           <button
             type="button"
             onClick={() => toast.info('شاشة تحصيل مديونية عميل')}
-            className="px-3 py-1 rounded-lg bg-[#10b981] hover:bg-[#059669] text-white text-[11px] font-black flex items-center gap-1 transition-colors cursor-pointer"
+            className="px-3.5 py-1.5 rounded-lg bg-[#10b981] hover:bg-[#059669] text-white text-xs font-black flex items-center gap-1.5 transition-colors cursor-pointer"
           >
-            <Banknote className="w-3 h-3" />
+            <Banknote className="w-3.5 h-3.5" />
             <span>تحصيل عميل</span>
           </button>
 
           <button
             type="button"
             onClick={() => toast.info('شاشة سداد دفعة لمورد')}
-            className="px-3 py-1 rounded-lg bg-[#f43f5e] hover:bg-[#e11d48] text-white text-[11px] font-black flex items-center gap-1 transition-colors cursor-pointer"
+            className="px-3.5 py-1.5 rounded-lg bg-[#f43f5e] hover:bg-[#e11d48] text-white text-xs font-black flex items-center gap-1.5 transition-colors cursor-pointer"
           >
-            <Building2 className="w-3 h-3" />
+            <Building2 className="w-3.5 h-3.5" />
             <span>دفع لمورد</span>
           </button>
 
           <button
             type="button"
             onClick={() => setShiftModalOpen(true)}
-            className="px-3 py-1 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-white text-[11px] font-black flex items-center gap-1 transition-colors cursor-pointer"
+            className="px-3.5 py-1.5 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-white text-xs font-black flex items-center gap-1.5 transition-colors cursor-pointer"
           >
-            <LogOut className="w-3 h-3" />
+            <LogOut className="w-3.5 h-3.5" />
             <span>إغلاق الوردية</span>
           </button>
         </div>
@@ -627,61 +627,61 @@ export default function POSPage() {
       </div>
 
       {/* ─── 2. SEARCH & CUSTOMER BAR (Matches Image 1) ─── */}
-      <div className="bg-[#0b1528] border-b border-slate-800/80 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+      <div className="bg-[#0b1528] border-b border-slate-800 px-5 py-3.5 flex items-center justify-between gap-4 flex-wrap shadow-sm">
         
         {/* Left/Center: Search Bar with Clear & Counter */}
-        <div className="flex-1 min-w-[280px] max-w-2xl relative">
+        <div className="flex-1 min-w-[320px] max-w-3xl relative">
           <Input
             ref={searchInputRef}
             placeholder="ابحث هنا... [F2]"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             onKeyDown={handleSearchKeyDown}
-            className="h-11 bg-[#13223d] border-slate-700 text-white rounded-xl pr-10 pl-16 text-sm font-bold placeholder:text-slate-500 focus:border-blue-500"
+            className="h-13 bg-[#13223d] border-slate-700 text-white rounded-2xl pr-12 pl-20 text-base font-bold placeholder:text-slate-500 focus:border-blue-500 shadow-inner"
             autoFocus
           />
-          <div className="absolute right-3 top-3 text-slate-400 pointer-events-none">
-            <Search className="w-4 h-4" />
+          <div className="absolute right-4 top-4 text-slate-400 pointer-events-none">
+            <Search className="w-5 h-5" />
           </div>
-          <div className="absolute left-2.5 top-2 flex items-center gap-1">
+          <div className="absolute left-3 top-2.5 flex items-center gap-1.5">
             {searchTerm && (
               <button
                 type="button"
                 onClick={() => setSearchTerm('')}
-                className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center cursor-pointer"
+                className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center cursor-pointer"
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="w-4 h-4" />
               </button>
             )}
-            <span className="px-2 py-0.5 rounded-md bg-blue-900/60 text-blue-300 font-mono text-xs font-bold">
+            <span className="px-3 py-1 rounded-lg bg-blue-900/80 text-blue-200 font-mono text-sm font-black border border-blue-700/50">
               {cart.length}
             </span>
           </div>
         </div>
 
         {/* Price Category Dropdown */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <div className="relative">
-            <div className="flex items-center gap-1.5 px-3 py-2 bg-[#13223d] border border-slate-700 rounded-xl text-xs font-black text-slate-300">
-              <Tag className="w-3.5 h-3.5 text-blue-400" />
+            <div className="flex items-center gap-2 px-4 py-2.5 bg-[#13223d] border border-slate-700 rounded-2xl text-xs sm:text-sm font-black text-slate-200">
+              <Tag className="w-4 h-4 text-blue-400" />
               <span className="text-slate-400 font-normal">فئة السعر:</span>
               <select
                 value={priceCategory}
                 onChange={e => setPriceCategory(e.target.value as any)}
-                className="bg-transparent text-white font-bold outline-none cursor-pointer text-xs"
+                className="bg-transparent text-white font-black outline-none cursor-pointer text-xs sm:text-sm"
               >
-                <option value="default" className="bg-[#0b1528] text-white">الافتراضي</option>
-                <option value="wholesale" className="bg-[#0b1528] text-white">جملة</option>
-                <option value="retail" className="bg-[#0b1528] text-white">قطاعي</option>
+                <option value="default" className="bg-[#0b1528] text-white font-bold">الافتراضي</option>
+                <option value="wholesale" className="bg-[#0b1528] text-white font-bold">جملة</option>
+                <option value="retail" className="bg-[#0b1528] text-white font-bold">قطاعي</option>
               </select>
             </div>
-            <span className="absolute -top-2 left-2 text-[9px] bg-slate-800 text-slate-400 px-1 rounded font-mono">
+            <span className="absolute -top-2 left-3 text-[9px] bg-slate-800 text-blue-300 px-1.5 py-0.5 rounded font-mono font-bold border border-slate-700">
               F2
             </span>
           </div>
 
           {/* Customer / Supplier Mode Buttons */}
-          <div className="flex items-center bg-[#13223d] border border-slate-700 p-1 rounded-xl gap-1">
+          <div className="flex items-center bg-[#13223d] border border-slate-700 p-1.5 rounded-2xl gap-1.5 shadow-inner">
             <button
               type="button"
               onClick={() => {
@@ -689,11 +689,11 @@ export default function POSPage() {
                 setCustomerName('عميل نقدي')
                 setSelectedCustomerId(null)
               }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
-                customerMode === 'cash' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+                customerMode === 'cash' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
               }`}
             >
-              <User className="w-3.5 h-3.5" />
+              <User className="w-4 h-4" />
               <span>نقدي</span>
             </button>
 
@@ -706,11 +706,11 @@ export default function POSPage() {
                   setCustomerName(name.trim())
                 }
               }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
-                customerMode === 'customer' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+                customerMode === 'customer' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
               }`}
             >
-              <User className="w-3.5 h-3.5" />
+              <User className="w-4 h-4" />
               <span>{customerMode === 'customer' ? customerName : 'العملاء'}</span>
             </button>
 
@@ -723,11 +723,11 @@ export default function POSPage() {
                   setCustomerName(sName.trim())
                 }
               }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
-                customerMode === 'supplier' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+                customerMode === 'supplier' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
               }`}
             >
-              <Building2 className="w-3.5 h-3.5" />
+              <Building2 className="w-4 h-4" />
               <span>{customerMode === 'supplier' ? customerName : 'مورد'}</span>
             </button>
           </div>
@@ -737,13 +737,13 @@ export default function POSPage() {
 
       {/* ─── 3. QUICK ITEMS GALLERY (Toggleable) ─── */}
       {showQuickItems && (
-        <div className="bg-[#0b1528] border-b border-slate-800 p-3 space-y-2.5">
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar-horizontal">
+        <div className="bg-[#0b1528] border-b border-slate-800 p-4 space-y-3">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1.5 custom-scrollbar-horizontal">
             <button
               type="button"
               onClick={() => setSelectedCatId('all')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold shrink-0 transition-colors ${
-                selectedCatId === 'all' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black shrink-0 transition-colors ${
+                selectedCatId === 'all' ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
               }`}
             >
               الكل ({allItems.length})
@@ -753,8 +753,8 @@ export default function POSPage() {
                 key={c.id}
                 type="button"
                 onClick={() => setSelectedCatId(c.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold shrink-0 transition-colors ${
-                  selectedCatId === c.id ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black shrink-0 transition-colors ${
+                  selectedCatId === c.id ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                 }`}
               >
                 {c.name}
@@ -762,16 +762,16 @@ export default function POSPage() {
             ))}
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2 max-h-36 overflow-y-auto">
+          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2.5 max-h-44 overflow-y-auto p-1">
             {quickItems.map(item => (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => handleItemClick(item)}
-                className="p-2 rounded-xl bg-[#13223d] hover:bg-blue-900/40 border border-slate-700 text-right flex flex-col justify-between gap-1 transition-all cursor-pointer active:scale-95"
+                className="p-3 rounded-2xl bg-[#13223d] hover:bg-blue-900/40 border border-slate-700 text-right flex flex-col justify-between gap-1.5 transition-all cursor-pointer active:scale-95 shadow-xs"
               >
-                <p className="text-xs font-bold text-white truncate w-full">{item.name}</p>
-                <span className="text-xs font-black text-emerald-400 font-mono" dir="ltr">
+                <p className="text-xs sm:text-sm font-black text-white truncate w-full">{item.name}</p>
+                <span className="text-xs sm:text-sm font-black text-emerald-400 font-mono" dir="ltr">
                   {cleanPositivePrice(item.sell_price).toFixed(2)} ج.م
                 </span>
               </button>
@@ -781,73 +781,73 @@ export default function POSPage() {
       )}
 
       {/* ─── 4. MAIN CART DISPLAY / EMPTY BAG ILLUSTRATION (Matches Image 1) ─── */}
-      <div className="flex-1 flex flex-col p-4 overflow-y-auto min-h-[300px]">
+      <div className="flex-1 flex flex-col p-5 overflow-y-auto min-h-[340px]">
         {cart.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-slate-500 space-y-4 my-auto">
-            <div className="w-24 h-24 rounded-3xl bg-[#0e1b33] border border-slate-800 flex items-center justify-center text-slate-600 shadow-inner">
-              <ShoppingBag className="w-12 h-12 stroke-1 text-slate-500" />
+          <div className="flex-1 flex flex-col items-center justify-center text-slate-500 space-y-5 my-auto">
+            <div className="w-28 h-28 rounded-3xl bg-[#0e1b33] border border-slate-800/80 flex items-center justify-center text-slate-500 shadow-2xl">
+              <ShoppingBag className="w-14 h-14 stroke-1 text-slate-400 opacity-60" />
             </div>
-            <p className="text-lg sm:text-xl font-bold text-slate-400 tracking-wide">
+            <p className="text-xl sm:text-2xl font-black text-slate-300 tracking-wide">
               السلة فارغة، ابدأ بإضافة المنتجات
             </p>
           </div>
         ) : (
-          <div className="bg-[#0b1528] rounded-2xl border border-slate-800 overflow-hidden shadow-xl">
-            <table className="w-full text-right text-sm">
+          <div className="bg-[#0b1528] rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
+            <table className="w-full text-right text-sm sm:text-base">
               <thead>
-                <tr className="bg-[#13223d] border-b border-slate-800 text-xs font-black text-slate-400">
-                  <th className="p-3.5">الصنف</th>
-                  <th className="p-3.5 text-center">السعر</th>
-                  <th className="p-3.5 text-center w-48">الكمية</th>
-                  <th className="p-3.5 text-center">الإجمالي</th>
-                  <th className="p-3.5 text-center w-12">حذف</th>
+                <tr className="bg-[#13223d] border-b border-slate-800 text-xs sm:text-sm font-black text-slate-300">
+                  <th className="p-4">الصنف</th>
+                  <th className="p-4 text-center">السعر</th>
+                  <th className="p-4 text-center w-56">الكمية</th>
+                  <th className="p-4 text-center">الإجمالي</th>
+                  <th className="p-4 text-center w-14">حذف</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/80 font-bold">
+              <tbody className="divide-y divide-slate-800/80 font-black">
                 {cart.map(item => (
-                  <tr key={item.id} className="hover:bg-slate-800/40 transition-colors">
-                    <td className="p-3.5">
-                      <p className="text-white font-bold">{item.name}</p>
+                  <tr key={item.id} className="hover:bg-slate-800/50 transition-colors">
+                    <td className="p-4">
+                      <p className="text-white font-black text-base sm:text-lg">{item.name}</p>
                       {item.allow_decimal && (
-                        <span className="text-[10px] text-blue-400 font-bold">
+                        <span className="text-xs text-blue-400 font-bold">
                           وزن: {Math.round(item.quantity * 1000)} جرام
                         </span>
                       )}
                     </td>
-                    <td className="p-3.5 text-center font-mono text-slate-300" dir="ltr">
+                    <td className="p-4 text-center font-mono text-slate-200 text-base" dir="ltr">
                       {item.unit_price.toFixed(2)}
                     </td>
-                    <td className="p-3.5 text-center">
-                      <div className="flex items-center justify-center gap-1.5">
+                    <td className="p-4 text-center">
+                      <div className="flex items-center justify-center gap-2">
                         <button
                           type="button"
                           onClick={() => updateQuantity(item.id, -1)}
-                          className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center cursor-pointer"
+                          className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center cursor-pointer active:scale-95"
                         >
-                          <Minus className="w-3 h-3" />
+                          <Minus className="w-4 h-4" />
                         </button>
-                        <span className="font-mono font-black text-sm px-2 text-white">
+                        <span className="font-mono font-black text-base px-3 text-white">
                           {item.quantity}
                         </span>
                         <button
                           type="button"
                           onClick={() => updateQuantity(item.id, 1)}
-                          className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center cursor-pointer"
+                          className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center cursor-pointer active:scale-95"
                         >
-                          <Plus className="w-3 h-3" />
+                          <Plus className="w-4 h-4" />
                         </button>
                       </div>
                     </td>
-                    <td className="p-3.5 text-center font-mono font-black text-emerald-400" dir="ltr">
+                    <td className="p-4 text-center font-mono font-black text-emerald-400 text-lg" dir="ltr">
                       {item.total.toFixed(2)}
                     </td>
-                    <td className="p-3.5 text-center">
+                    <td className="p-4 text-center">
                       <button
                         type="button"
                         onClick={() => removeFromCart(item.id)}
-                        className="w-8 h-8 rounded-lg hover:bg-rose-950/60 text-slate-500 hover:text-rose-400 flex items-center justify-center transition-colors cursor-pointer"
+                        className="w-9 h-9 rounded-xl hover:bg-rose-950/60 text-slate-500 hover:text-rose-400 flex items-center justify-center transition-colors cursor-pointer"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-5 h-5" />
                       </button>
                     </td>
                   </tr>
@@ -859,48 +859,48 @@ export default function POSPage() {
       </div>
 
       {/* ─── 5. FIXED BOTTOM SUMMARY & CHECKOUT ACTIONS (Matches Image 1) ─── */}
-      <div className="bg-[#0b1528] border-t border-slate-800 p-4 space-y-3 shadow-2xl">
+      <div className="bg-[#0b1528] border-t border-slate-800 p-5 space-y-4 shadow-2xl">
         
         {/* Row 1: Figures & Summary Labels */}
-        <div className="flex items-center justify-between flex-wrap gap-4 px-2 border-b border-slate-800/80 pb-3">
+        <div className="flex items-center justify-between flex-wrap gap-4 px-2 border-b border-slate-800/80 pb-3.5">
           
           {/* Left: Final Net Amount (Large Bold Glowing) */}
-          <div className="flex items-baseline gap-2">
-            <span className="text-xs font-bold text-slate-400">الصافي النهائي:</span>
-            <span className="text-3xl sm:text-4xl font-black text-emerald-400 font-mono tracking-tight" dir="ltr">
-              {finalTotal.toFixed(2)} <span className="text-sm font-bold">ج.م</span>
+          <div className="flex items-baseline gap-3">
+            <span className="text-sm font-black text-slate-400">الصافي النهائي:</span>
+            <span className="text-4xl sm:text-5xl font-black text-emerald-400 font-mono tracking-tight" dir="ltr">
+              {finalTotal.toFixed(2)} <span className="text-base sm:text-lg font-bold">ج.م</span>
             </span>
           </div>
 
           {/* Center/Right: Subtotal, Discounts, and Items count */}
-          <div className="flex items-center gap-6 flex-wrap text-sm font-bold">
+          <div className="flex items-center gap-8 flex-wrap text-sm sm:text-base font-black">
             <div className="flex items-center gap-2 text-slate-300">
-              <span className="text-xs text-slate-400 font-semibold">إجمالي الخصومات:</span>
-              <span className="font-mono text-amber-400 font-bold" dir="ltr">{totalDiscount.toFixed(2)} ج.م</span>
+              <span className="text-xs sm:text-sm text-slate-400 font-bold">إجمالي الخصومات:</span>
+              <span className="font-mono text-amber-400 font-black text-base" dir="ltr">{totalDiscount.toFixed(2)} ج.م</span>
             </div>
 
             <div className="flex items-center gap-2 text-slate-300">
-              <span className="text-xs text-slate-400 font-semibold">الإجمالي قبل الخصم:</span>
-              <span className="font-mono text-white font-bold" dir="ltr">{subtotal.toFixed(2)} ج.م</span>
+              <span className="text-xs sm:text-sm text-slate-400 font-bold">الإجمالي قبل الخصم:</span>
+              <span className="font-mono text-white font-black text-base" dir="ltr">{subtotal.toFixed(2)} ج.م</span>
             </div>
 
             <div className="flex items-center gap-2 text-slate-300">
-              <span className="text-xs text-slate-400 font-semibold">الأصناف:</span>
-              <span className="font-mono text-white text-base font-black">{totalItemsCount}</span>
+              <span className="text-xs sm:text-sm text-slate-400 font-bold">الأصناف:</span>
+              <span className="font-mono text-white text-lg font-black">{totalItemsCount}</span>
             </div>
           </div>
 
         </div>
 
         {/* Row 2: Bottom Action Checkout Buttons (Matches Image 1) */}
-        <div className="flex items-center justify-between gap-2.5 flex-wrap">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           
           {/* Left Sub Actions */}
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2.5 flex-wrap">
             <button
               type="button"
               onClick={handleHoldCart}
-              className="px-4 py-2.5 rounded-xl bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-xs font-black flex items-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer"
+              className="px-5 py-3 rounded-2xl bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-xs sm:text-sm font-black flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer"
             >
               <FileSpreadsheet className="w-4 h-4" />
               <span>مسودة</span>
@@ -908,7 +908,7 @@ export default function POSPage() {
 
             <Link
               href="/dashboard/quotations"
-              className="px-4 py-2.5 rounded-xl bg-[#f59e0b] hover:bg-[#d97706] text-white text-xs font-black flex items-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer"
+              className="px-5 py-3 rounded-2xl bg-[#f59e0b] hover:bg-[#d97706] text-white text-xs sm:text-sm font-black flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer"
             >
               <Receipt className="w-4 h-4" />
               <span>عرض سعر</span>
@@ -918,7 +918,7 @@ export default function POSPage() {
               type="button"
               disabled={cart.length === 0}
               onClick={() => router.push('/dashboard/sales-returns')}
-              className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+              className="px-5 py-3 rounded-2xl bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 text-xs sm:text-sm font-black flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
             >
               <RotateCcw className="w-4 h-4" />
               <span>مرتجع</span>
@@ -926,16 +926,16 @@ export default function POSPage() {
           </div>
 
           {/* Right Main Payment Checkout Buttons */}
-          <div className="flex items-center gap-2.5 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap">
             
             {/* Credit Sale */}
             <button
               type="button"
               disabled={isProcessing || cart.length === 0}
               onClick={() => handleCompleteSale('credit')}
-              className="px-5 py-2.5 rounded-xl bg-[#8b5cf6] hover:bg-[#7c3aed] text-white text-xs sm:text-sm font-black flex items-center gap-2 shadow-lg shadow-purple-600/20 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+              className="px-6 py-3 rounded-2xl bg-[#8b5cf6] hover:bg-[#7c3aed] text-white text-sm sm:text-base font-black flex items-center gap-2 shadow-lg shadow-purple-600/20 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
             >
-              <CreditCard className="w-4 h-4" />
+              <CreditCard className="w-5 h-5" />
               <span>بيع آجل</span>
             </button>
 
@@ -944,20 +944,20 @@ export default function POSPage() {
               type="button"
               disabled={isProcessing || cart.length === 0}
               onClick={() => handleCompleteSale('split')}
-              className="px-5 py-2.5 rounded-xl bg-[#334155] hover:bg-[#475569] text-white text-xs sm:text-sm font-black flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+              className="px-6 py-3 rounded-2xl bg-[#334155] hover:bg-[#475569] text-white text-sm sm:text-base font-black flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer disabled:opacity-50"
             >
-              <ArrowRightLeft className="w-4 h-4" />
+              <ArrowRightLeft className="w-5 h-5" />
               <span>دفع مختلط (F9)</span>
             </button>
 
-            {/* Cash Payment (Prominent Emerald Button) */}
+            {/* Cash Payment (Prominent Emerald Button - Large & High Impact) */}
             <button
               type="button"
               disabled={isProcessing || cart.length === 0}
               onClick={() => handleCompleteSale('cash')}
-              className="px-8 py-3 rounded-xl bg-[#10b981] hover:bg-[#059669] text-white text-sm sm:text-base font-black flex items-center gap-2 shadow-xl shadow-emerald-600/30 transition-all hover:scale-105 active:scale-95 cursor-pointer disabled:opacity-50"
+              className="px-10 py-3.5 rounded-2xl bg-[#10b981] hover:bg-[#059669] text-white text-base sm:text-lg font-black flex items-center gap-2.5 shadow-2xl shadow-emerald-600/40 transition-all hover:scale-105 active:scale-95 cursor-pointer disabled:opacity-50"
             >
-              <Banknote className="w-5 h-5" />
+              <Banknote className="w-6 h-6" />
               <span>دفع نقدي (F10)</span>
             </button>
 
@@ -966,7 +966,7 @@ export default function POSPage() {
               type="button"
               disabled={cart.length === 0}
               onClick={clearCart}
-              className="px-4 py-2.5 rounded-xl bg-[#ef4444] hover:bg-[#dc2626] text-white text-xs sm:text-sm font-black flex items-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+              className="px-5 py-3 rounded-2xl bg-[#ef4444] hover:bg-[#dc2626] text-white text-xs sm:text-sm font-black flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer disabled:opacity-50"
             >
               <X className="w-4 h-4" />
               <span>إلغاء (F12)</span>

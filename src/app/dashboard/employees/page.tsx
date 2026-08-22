@@ -29,19 +29,34 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useStore } from '@/lib/store-context'
 import { DEFAULT_STORE_UUID } from '@/lib/sync-engine'
-import { DEFAULT_ADMIN } from '@/lib/auth-context'
+import { useAuth } from '@/lib/auth-context'
 import type { Employee } from '@/lib/types'
 
 export default function EmployeesPage() {
   const { storeId } = useStore()
+  const { role: userRole, currentUser } = useAuth()
   const currentStoreId = storeId || DEFAULT_STORE_UUID
+
+  if (userRole !== 'admin') {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 bg-rose-500/10 border-2 border-rose-500/30 rounded-3xl text-center space-y-4 max-w-xl mx-auto my-12" dir="rtl">
+        <div className="w-16 h-16 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center border border-rose-500/30">
+          <Lock className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-black text-rose-500">غير مصرح لك بالوصول إلى إدارة الموظفين</h2>
+        <p className="text-sm font-semibold text-slate-400 leading-relaxed">
+          هذه الشاشة مقتصرة حصرياً على المدير العام (Admin) لإدارة الحسابات وتعيين الصلاحيات.
+        </p>
+      </div>
+    )
+  }
 
   const [searchTerm, setSearchTerm] = useState('')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [pinCode, setPinCode] = useState('')
-  const [role, setRole] = useState<'admin' | 'supervisor' | 'cashier'>('cashier')
+  const [selectedRole, setSelectedRole] = useState<'admin' | 'supervisor' | 'cashier'>('cashier')
   const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -80,7 +95,7 @@ export default function EmployeesPage() {
         name: name.trim(),
         email: email.trim().toLowerCase(),
         phone: phone.trim() || undefined,
-        role_id: role,
+        role_id: selectedRole,
         pin_code: pinCode.trim(),
         status: 'active',
         created_at: now,
@@ -95,7 +110,7 @@ export default function EmployeesPage() {
       setEmail('')
       setPhone('')
       setPinCode('')
-      setRole('cashier')
+      setSelectedRole('cashier')
     } catch (err: any) {
       toast.error('حدث خطأ أثناء إضافة الحساب: ' + err.message)
     } finally {
@@ -133,26 +148,26 @@ export default function EmployeesPage() {
         {/* Employees Table (2 Cols) */}
         <div className="lg:col-span-2 space-y-4">
           
-          {/* Primary System Admin Badge Card */}
-          <div className="p-4 rounded-2xl bg-gradient-to-l from-purple-900/40 via-slate-900 to-slate-900 border border-purple-500/30 flex items-center justify-between text-white">
+          {/* Primary System Admin Security Card */}
+          <div className="p-4 rounded-2xl bg-gradient-to-l from-slate-900 via-slate-900 to-indigo-950/60 border border-slate-800 flex items-center justify-between text-white">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-300">
-                <Crown className="w-5 h-5" />
+              <div className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-300">
+                <ShieldCheck className="w-5 h-5" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-black text-white">{DEFAULT_ADMIN.name} (حساب النظام الأساسي)</span>
-                  <span className="bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-black px-2 py-0.5 rounded-md">
-                    مدير عام Super Admin
+                  <span className="text-sm font-black text-white">مركز التحكم في المستخدمين والتراخيص</span>
+                  <span className="bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[10px] font-black px-2 py-0.5 rounded-md">
+                    Enterprise RBAC
                   </span>
                 </div>
-                <p className="text-xs font-mono text-slate-400 mt-0.5">
-                  البريد: <strong className="text-slate-200">{DEFAULT_ADMIN.email}</strong> • كلمة المرور: <strong className="text-slate-200">••••••••</strong>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  جميع كلمات المرور مشفرة ومحمية محلياً وسحابياً — الصلاحيات معزولة تماماً حسب الدور الوظيفي
                 </p>
               </div>
             </div>
             <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
-              حساب نشط ومحمي
+              نظام محمي
             </span>
           </div>
 
@@ -297,7 +312,7 @@ export default function EmployeesPage() {
 
                 <div className="space-y-1.5">
                   <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">الدور الوظيفي والصلاحيات *</Label>
-                  <Select value={role} onValueChange={(v: any) => setRole(v)}>
+                  <Select value={selectedRole} onValueChange={(v: any) => setSelectedRole(v)}>
                     <SelectTrigger className="h-11 text-sm font-bold bg-slate-50/80 dark:bg-slate-800/80 rounded-xl">
                       <SelectValue />
                     </SelectTrigger>

@@ -118,6 +118,27 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   // Permission Check Guard for current page
   const hasAccess = canAccessRoute(role, pathname)
 
+  // Dedicated 100% Full-Screen Layout for POS Terminal (Matches Reference System)
+  if (pathname === '/dashboard/pos') {
+    return (
+      <div className="w-screen h-screen overflow-hidden bg-[#070d18] text-white" dir="rtl">
+        {hasAccess ? (
+          children
+        ) : (
+          <div className="flex h-screen items-center justify-center p-4">
+            <div className="bg-rose-500/10 border-2 border-rose-500/30 rounded-3xl p-8 text-center space-y-4 max-w-xl">
+              <Lock className="w-12 h-12 text-rose-500 mx-auto" />
+              <h3 className="text-xl font-black text-rose-500">غير مصرح لك بنقطة البيع</h3>
+              <Button onClick={() => router.push('/dashboard')} className="bg-blue-600 font-bold">
+                العودة للرئيسية
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 overflow-hidden font-sans antialiased" dir="rtl">
       

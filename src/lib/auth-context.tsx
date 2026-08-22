@@ -79,7 +79,13 @@ export function canAccessRoute(role: UserRole, pathname: string): boolean {
   if (role === 'admin') return true
   const allowed = ROLE_PERMISSIONS[role]?.allowedRoutes || []
   if (allowed.includes('*')) return true
-  return allowed.some(route => pathname === route || pathname.startsWith(route + '/'))
+  
+  return allowed.some(route => {
+    if (route === '/dashboard') {
+      return pathname === '/dashboard'
+    }
+    return pathname === route || pathname.startsWith(route + '/')
+  })
 }
 
 interface AuthContextType {

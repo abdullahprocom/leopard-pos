@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react'
 import { db } from '@/lib/db'
 import { syncEngine, DEFAULT_STORE_UUID, DEFAULT_USER_UUID, getTenantInfo } from '@/lib/sync-engine'
 import { useStore } from '@/lib/store-context'
+import { useAuth } from '@/lib/auth-context'
 import { BusinessType } from '@/lib/types'
 import { toast } from 'sonner'
-import { Save, Store, Printer, RefreshCw, Database, ShieldCheck, Key, Layers, CheckCircle2, Trash2 } from 'lucide-react'
+import { Save, Store, Printer, RefreshCw, Database, ShieldCheck, Key, Layers, CheckCircle2, Trash2, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -14,7 +15,22 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 export default function SettingsPage() {
+  const { role } = useAuth()
   const { storeId, branchId, storeName, setStoreName, businessType, setBusinessType, purgeAndReseedCategories, activationToken, activateOfflineSystem, isActivated } = useStore()
+
+  if (role !== 'admin') {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 bg-rose-500/10 border-2 border-rose-500/30 rounded-3xl text-center space-y-4 max-w-xl mx-auto my-12" dir="rtl">
+        <div className="w-16 h-16 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center border border-rose-500/30">
+          <Lock className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-black text-rose-500">غير مصرح لك بالوصول إلى إعدادات النظام</h2>
+        <p className="text-sm font-semibold text-slate-400 leading-relaxed">
+          هذه الشاشة مقتصرة حصرياً على المدير العام (Admin) لتغيير النشاط وإعدادات الطابعات والبيانات.
+        </p>
+      </div>
+    )
+  }
   const [localStoreName, setLocalStoreName] = useState(storeName)
   const [localBusinessType, setLocalBusinessType] = useState<BusinessType>(businessType)
   const [currency, setCurrency] = useState('EGP')
