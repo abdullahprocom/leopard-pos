@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Cairo } from "next/font/google";
 import { Toaster } from "sonner";
 import { StoreProvider } from "@/lib/store-context";
+import { AuthProvider } from "@/lib/auth-context";
 import "./globals.css";
 
 const cairo = Cairo({
@@ -29,8 +30,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ar" dir="rtl" className={`dark h-full antialiased ${cairo.variable}`}>
       <body className={`min-h-full flex flex-col font-sans ${cairo.className} bg-slate-950 text-slate-100`}>
         <StoreProvider>
-          {children}
-          <Toaster position="top-center" richColors dir="rtl" />
+          <AuthProvider>
+            {children}
+            <Toaster position="top-center" richColors dir="rtl" />
+          </AuthProvider>
         </StoreProvider>
       </body>
     </html>

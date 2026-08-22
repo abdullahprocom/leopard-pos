@@ -2,7 +2,7 @@
 
 import { ReactNode, useState, useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import {
   Home,
   Package,
@@ -17,44 +17,76 @@ import {
   Building2,
   UserCog,
   Settings,
-  Sparkles,
   Menu,
   X,
   ShieldCheck,
   BarChart3,
+  Calculator,
+  Printer,
+  Headphones,
+  Bell,
+  LogOut,
+  User,
+  Crown,
+  CreditCard,
+  Lock,
+  Tag,
+  FileSpreadsheet,
+  DollarSign,
 } from 'lucide-react'
 import { OnlineStatus } from '@/components/OnlineStatus'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { useStore } from '@/lib/store-context'
+import { useAuth, canAccessRoute } from '@/lib/auth-context'
+import { CalculatorModal } from '@/components/calculator-modal'
+import { Button } from '@/components/ui/button'
 
 // Complete navigation links with modern Lucide icons
 const navLinks = [
-  { label: 'الرئيسية', href: '/dashboard', icon: Home },
-  { label: 'نقطة البيع (الكاشير)', href: '/dashboard/pos', icon: ShoppingCart, highlight: true },
-  { label: 'التقارير والأرباح', href: '/dashboard/reports', icon: BarChart3 },
-  { label: 'الأصناف والمخزون', href: '/dashboard/items', icon: Package },
-  { label: 'المشتريات', href: '/dashboard/purchases', icon: ShoppingBag },
-  { label: 'مرتجع الشراء', href: '/dashboard/purchase-returns', icon: Undo2 },
-  { label: 'الجرد والتسوية', href: '/dashboard/stocktaking', icon: ClipboardList },
-  { label: 'النقل المخزني', href: '/dashboard/transfers', icon: ArrowLeftRight },
-  { label: 'سجل المبيعات', href: '/dashboard/sales', icon: Receipt },
-  { label: 'مرتجع المبيعات', href: '/dashboard/sales-returns', icon: RotateCcw },
-  { label: 'العملاء', href: '/dashboard/customers', icon: Users },
-  { label: 'الموردين', href: '/dashboard/suppliers', icon: Building2 },
-  { label: 'الموظفين والصلاحيات', href: '/dashboard/employees', icon: UserCog },
-  { label: 'إعدادات النظام', href: '/dashboard/settings', icon: Settings },
+  { label: 'الرئيسية', href: '/dashboard', icon: Home, roles: ['admin', 'supervisor', 'cashier'] },
+  { label: 'نقطة البيع (الكاشير)', href: '/dashboard/pos', icon: ShoppingCart, highlight: true, roles: ['admin', 'supervisor', 'cashier'] },
+  { label: 'الأصناف والمخزون', href: '/dashboard/items', icon: Package, roles: ['admin', 'supervisor'] },
+  { label: 'المشتريات والفواتير', href: '/dashboard/purchases', icon: ShoppingBag, roles: ['admin', 'supervisor'] },
+  { label: 'مرتجع الشراء', href: '/dashboard/purchase-returns', icon: Undo2, roles: ['admin', 'supervisor'] },
+  { label: 'المصروفات اليومية', href: '/dashboard/expenses', icon: DollarSign, roles: ['admin', 'supervisor'] },
+  { label: 'طباعة الباركود', href: '/dashboard/barcode-print', icon: Tag, roles: ['admin', 'supervisor'] },
+  { label: 'الجرد والتسوية', href: '/dashboard/stocktaking', icon: ClipboardList, roles: ['admin', 'supervisor'] },
+  { label: 'النقل المخزني', href: '/dashboard/transfers', icon: ArrowLeftRight, roles: ['admin', 'supervisor'] },
+  { label: 'سجل المبيعات', href: '/dashboard/sales', icon: Receipt, roles: ['admin', 'supervisor', 'cashier'] },
+  { label: 'مرتجع المبيعات', href: '/dashboard/sales-returns', icon: RotateCcw, roles: ['admin', 'supervisor', 'cashier'] },
+  { label: 'عروض الأسعار', href: '/dashboard/quotations', icon: FileSpreadsheet, roles: ['admin', 'supervisor', 'cashier'] },
+  { label: 'العملاء', href: '/dashboard/customers', icon: Users, roles: ['admin', 'supervisor', 'cashier'] },
+  { label: 'الموردين', href: '/dashboard/suppliers', icon: Building2, roles: ['admin', 'supervisor'] },
+  { label: 'التقارير والأرباح', href: '/dashboard/reports', icon: BarChart3, roles: ['admin', 'supervisor'] },
+  { label: 'الموظفين والصلاحيات', href: '/dashboard/employees', icon: UserCog, roles: ['admin'] },
+  { label: 'إعدادات النظام', href: '/dashboard/settings', icon: Settings, roles: ['admin'] },
 ]
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname()
+  const router = useRouter()
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false)
+  const [isCalcOpen, setIsCalcOpen] = useState(false)
   const { storeName, businessType, isActivated } = useStore()
+  const { currentUser, role, roleLabel, logout, isAdmin, isCashier, isSupervisor } = useAuth()
 
   // Auto-close mobile drawer on route change
   useEffect(() => {
     setIsMobileOpen(false)
   }, [pathname])
+
+  // Global F4 shortcut for Calculator
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'F4') {
+        e.preventDefault()
+        setIsCalcOpen(prev => !prev)
+      }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [])
 
   const businessTypeLabels: Record<string, string> = {
     supermarket: 'سوبر ماركت',
@@ -63,6 +95,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     clothing: 'ملابس',
     restaurant: 'مطاعم',
   }
+
+  // Filter links for current role
+  const visibleNavLinks = navLinks.filter(item => !item.roles || item.roles.includes(role))
+
+  // Permission Check Guard for current page
+  const hasAccess = canAccessRoute(role, pathname)
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 overflow-hidden font-sans antialiased" dir="rtl">
@@ -108,7 +146,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           {/* Close button on mobile */}
           <button 
             type="button"
-            className="lg:hidden p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="lg:hidden p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
             onClick={() => setIsMobileOpen(false)}
           >
             <X className="w-6 h-6" />
@@ -117,7 +155,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
         {/* Sidebar Nav Links */}
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1.5 custom-scrollbar">
-          {navLinks.map((item) => {
+          {visibleNavLinks.map((item) => {
             const Icon = item.icon
             const isActive = item.href === '/dashboard'
               ? pathname === '/dashboard'
@@ -183,7 +221,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       <div className="flex-1 flex flex-col h-full overflow-hidden relative">
         
         {/* Top Navbar Header */}
-        <header className="h-20 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200/90 dark:border-slate-800 flex items-center justify-between px-4 sm:px-8 z-10 shadow-xs shrink-0 transition-colors">
+        <header className="h-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/90 dark:border-slate-800 flex items-center justify-between px-4 sm:px-8 z-10 shadow-xs shrink-0 transition-colors">
           <div className="flex items-center gap-3">
             {/* Burger Menu Button (Mobile & Desktop Toggle) */}
             <button
@@ -203,12 +241,47 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
             <div>
               <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight">
-                {navLinks.find(item => item.href === '/dashboard' ? pathname === '/dashboard' : (pathname === item.href || pathname.startsWith(item.href + '/')))?.label || 'لوحة القيادة'}
+                {visibleNavLinks.find(item => item.href === '/dashboard' ? pathname === '/dashboard' : (pathname === item.href || pathname.startsWith(item.href + '/')))?.label || 'لوحة التحكم'}
               </h2>
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
+          {/* Header Quick Tools Bar */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Calculator Quick Action Button */}
+            <button
+              type="button"
+              onClick={() => setIsCalcOpen(true)}
+              className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold shadow-2xs"
+              title="فتح الآلة الحاسبة (F4)"
+            >
+              <Calculator className="w-4 h-4 text-blue-500" />
+              <span className="hidden sm:inline">آلة حاسبة</span>
+            </button>
+
+            {/* Active User Profile & Role Switcher */}
+            <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 px-3 py-1.5 rounded-xl">
+              <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs">
+                {role === 'admin' ? <Crown className="w-4 h-4" /> : role === 'supervisor' ? <ShieldCheck className="w-4 h-4" /> : <CreditCard className="w-4 h-4" />}
+              </div>
+              <div className="hidden md:block text-right">
+                <p className="text-xs font-black text-slate-900 dark:text-white leading-tight">
+                  {currentUser.name}
+                </p>
+                <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 leading-tight">
+                  {role === 'admin' ? 'مدير النظام' : role === 'supervisor' ? 'المشرف' : 'الكاشير'}
+                </p>
+              </div>
+
+              <Link
+                href="/login"
+                className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
+                title="تبديل المستخدم / تسجيل الخروج"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+
             <OnlineStatus />
             <ThemeToggle />
           </div>
@@ -217,11 +290,34 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         {/* Scrollable Content Container */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 relative bg-slate-50 dark:bg-slate-950 transition-colors">
           <div className="max-w-7xl mx-auto w-full pb-28">
-            {children}
+            {hasAccess ? (
+              children
+            ) : (
+              <div className="bg-rose-500/10 border-2 border-rose-500/30 rounded-3xl p-8 text-center space-y-4 max-w-xl mx-auto my-12">
+                <div className="w-16 h-16 rounded-3xl bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto border border-rose-500/30">
+                  <Lock className="w-8 h-8" />
+                </div>
+                <h3 className="text-xl font-black text-rose-500">
+                  غير مصرح لك بالوصول إلى هذه الصفحة
+                </h3>
+                <p className="text-sm font-semibold text-slate-400 leading-relaxed">
+                  حسابك الحالي مسجل بصفة ({roleLabel})، وهذه الشاشة مخصصة لإدارة النظام فقط.
+                </p>
+                <Button
+                  onClick={() => router.push(isCashier ? '/dashboard/pos' : '/dashboard')}
+                  className="bg-blue-600 hover:bg-blue-500 text-white font-black rounded-xl h-11 px-6 shadow-lg shadow-blue-600/30 cursor-pointer"
+                >
+                  العودة للشاشة المسموحة
+                </Button>
+              </div>
+            )}
           </div>
         </main>
         
       </div>
+
+      {/* Global Interactive Calculator Modal */}
+      <CalculatorModal isOpen={isCalcOpen} onClose={() => setIsCalcOpen(false)} />
     </div>
   )
 }
