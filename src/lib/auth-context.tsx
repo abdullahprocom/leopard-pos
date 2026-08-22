@@ -89,7 +89,6 @@ interface AuthContextType {
   role: UserRole
   roleLabel: string
   login: (identifier: string, pass: string) => Promise<{ success: boolean; error?: string }>
-  registerAdmin: (name: string, email: string, pass: string) => Promise<{ success: boolean; error?: string }>
   logout: () => void
   canAccess: (pathname: string) => boolean
   isAdmin: boolean
@@ -205,53 +204,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const registerAdmin = async (name: string, email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
-    try {
-      const cleanName = name.trim()
-      const cleanEmail = email.trim().toLowerCase()
-      const cleanPass = pass.trim()
-
-      if (!cleanName || !cleanEmail || !cleanPass) {
-        return { success: false, error: 'يرجى ملء جميع الحقول المطلوبة' }
-      }
-
-      const existing = await db.employees.where('email').equals(cleanEmail).first()
-      if (existing) {
-        return { success: false, error: 'هذا البريد الإلكتروني مسجل بالفعل' }
-      }
-
-      const newAdmin: Employee = {
-        id: crypto.randomUUID(),
-        store_id: '00000000-0000-0000-0001-000000000001',
-        name: cleanName,
-        email: cleanEmail,
-        role_id: 'admin',
-        pin_code: cleanPass,
-        status: 'active',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }
-
-      await db.employees.add(newAdmin)
-
-      const user: AuthUser = {
-        id: newAdmin.id,
-        name: newAdmin.name,
-        email: newAdmin.email || cleanEmail,
-        role: 'admin',
-        branchName: 'الإدارة المركزية',
-      }
-
-      setCurrentUser(user)
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('erp_auth_session', JSON.stringify(user))
-      }
-      return { success: true }
-    } catch (err: any) {
-      return { success: false, error: 'فشل إنشاء الحساب: ' + err.message }
-    }
-  }
-
   const logout = () => {
     setCurrentUser(null)
     if (typeof window !== 'undefined') {
@@ -276,7 +228,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role: currentRole,
         roleLabel: ROLE_PERMISSIONS[currentRole]?.label || 'مستخدم',
         login,
-        registerAdmin,
         logout,
         canAccess,
         isAdmin: currentRole === 'admin',

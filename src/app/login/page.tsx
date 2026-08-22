@@ -12,7 +12,6 @@ import {
   Sparkles,
   Zap,
   Layers,
-  CheckCircle,
   AlertCircle,
   Pill,
   ShoppingCart,
@@ -29,13 +28,11 @@ import { toast } from 'sonner'
 
 export default function LoginPage() {
   const router = useRouter()
-  const { login, registerAdmin } = useAuth()
+  const { login } = useAuth()
   const { storeName, businessType } = useStore()
 
-  const [mode, setMode] = useState<'login' | 'register'>('login')
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
-  const [name, setName] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
@@ -71,32 +68,6 @@ export default function LoginPage() {
     }
   }
 
-  const handleRegisterSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setErrorMessage('')
-
-    if (!name.trim() || !identifier.trim() || !password.trim()) {
-      setErrorMessage('يرجى ملء جميع الحقول المطلوبة')
-      return
-    }
-
-    try {
-      setIsSubmitting(true)
-      const res = await registerAdmin(name.trim(), identifier.trim(), password.trim())
-      if (res.success) {
-        toast.success('تم إنشاء حساب المسؤول وتسجيل الدخول بنجاح')
-        router.push('/dashboard')
-      } else {
-        setErrorMessage(res.error || 'فشل إنشاء الحساب')
-        toast.error(res.error || 'فشل إنشاء الحساب')
-      }
-    } catch (err: any) {
-      setErrorMessage('حدث خطأ أثناء إنشاء الحساب: ' + err.message)
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
   const getBusinessIcon = () => {
     switch (businessType) {
       case 'pharmacy':
@@ -112,35 +83,20 @@ export default function LoginPage() {
     }
   }
 
-  const getBusinessSubTitle = () => {
-    switch (businessType) {
-      case 'pharmacy':
-        return 'نظام إدارة الصيدليات المتكامل'
-      case 'clothing':
-        return 'نظام إدارة محلات ومخازن الملابس المتكامل'
-      case 'supermarket':
-        return 'نظام إدارة السوبر ماركت ونقاط البيع'
-      case 'restaurant':
-        return 'نظام إدارة المطاعم والكافيهات المتكامل'
-      default:
-        return 'نظام إدارة المنشآت والأنشطة التجارية المتكامل'
-    }
-  }
-
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-slate-950 flex flex-col lg:flex-row select-none" dir="rtl">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col lg:flex-row select-none" dir="rtl">
       
-      {/* ─── 1. Left Section (White / Light Clean Auth Card) ─── */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 lg:p-16 order-2 lg:order-1">
-        <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-xl shadow-slate-200/50 dark:shadow-none border border-slate-100 dark:border-slate-800 p-8 sm:p-10 space-y-6">
+      {/* ─── 1. Form Section (RIGHT Side in RTL layout - Matches Image 3) ─── */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 lg:p-16 bg-white dark:bg-slate-900">
+        <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-2xl shadow-slate-200/60 dark:shadow-none border border-slate-100 dark:border-slate-800 p-8 sm:p-12 space-y-6">
           
           {/* Header */}
           <div className="text-right space-y-1.5">
             <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-              {mode === 'login' ? 'تسجيل الدخول' : 'إنشاء حساب مسؤول'}
+              تسجيل الدخول
             </h1>
             <p className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400">
-              {mode === 'login' ? 'سجل دخولك الآن للوصول إلى لوحة التحكم.' : 'أدخل بياناتك لإنشاء حساب المدير العام الأول للنظام.'}
+              سجل دخولك الآن للوصول إلى لوحة التحكم.
             </p>
           </div>
 
@@ -152,186 +108,90 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Form */}
-          {mode === 'login' ? (
-            <form onSubmit={handleLoginSubmit} className="space-y-4">
-              <div className="space-y-1.5 text-right">
-                <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                  البريد الإلكتروني أو اسم المستخدم
-                </Label>
-                <div className="relative">
-                  <Input
-                    type="text"
-                    value={identifier}
-                    onChange={e => {
-                      setIdentifier(e.target.value)
-                      setErrorMessage('')
-                    }}
-                    placeholder="example@domain.com"
-                    className="h-12 bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm font-semibold pl-10 focus:border-blue-500"
-                    autoFocus
-                  />
-                  <div className="absolute left-3.5 top-3.5 text-slate-400 pointer-events-none">
-                    <User className="w-5 h-5" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-1.5 text-right">
-                <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                  كلمة المرور
-                </Label>
-                <div className="relative">
-                  <Input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={e => {
-                      setPassword(e.target.value)
-                      setErrorMessage('')
-                    }}
-                    placeholder="••••••••••••"
-                    className="h-12 bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm font-semibold pl-10 pr-10 focus:border-blue-500 font-mono"
-                  />
-                  <div className="absolute right-3.5 top-3.5 text-slate-400 pointer-events-none">
-                    <Lock className="w-5 h-5" />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute left-3.5 top-3.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
-                  >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
-                </div>
-              </div>
-
-              <div className="text-right">
-                <button
-                  type="button"
-                  onClick={() => toast.info('يمكن للمدير إعادة تعيين كلمات مرور الموظفين من لوحة تحكم الموظفين.')}
-                  className="text-xs font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 hover:underline cursor-pointer"
-                >
-                  نسيت كلمة المرور؟
-                </button>
-              </div>
-
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full h-12 text-base font-black bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-xl shadow-lg shadow-blue-600/30 transition-all cursor-pointer mt-2"
-              >
-                {isSubmitting ? 'جاري تسجيل الدخول...' : 'تسجيل الدخول'}
-              </Button>
-            </form>
-          ) : (
-            <form onSubmit={handleRegisterSubmit} className="space-y-4">
-              <div className="space-y-1.5 text-right">
-                <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                  اسم المسؤول / المدير الكامل *
-                </Label>
+          {/* Login Form */}
+          <form onSubmit={handleLoginSubmit} className="space-y-4">
+            <div className="space-y-1.5 text-right">
+              <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                البريد الإلكتروني
+              </Label>
+              <div className="relative">
                 <Input
                   type="text"
-                  value={name}
-                  onChange={e => {
-                    setName(e.target.value)
-                    setErrorMessage('')
-                  }}
-                  placeholder="مثال: المدير العام"
-                  className="h-12 bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm font-semibold focus:border-blue-500"
-                  autoFocus
-                />
-              </div>
-
-              <div className="space-y-1.5 text-right">
-                <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                  البريد الإلكتروني للدخول *
-                </Label>
-                <Input
-                  type="email"
                   value={identifier}
                   onChange={e => {
                     setIdentifier(e.target.value)
                     setErrorMessage('')
                   }}
-                  placeholder="admin@yourdomain.com"
-                  className="h-12 bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm font-semibold focus:border-blue-500 font-mono"
-                  dir="ltr"
+                  placeholder="example@domain.com"
+                  className="h-12 bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm font-semibold pl-10 focus:border-blue-500"
+                  autoFocus
                 />
-              </div>
-
-              <div className="space-y-1.5 text-right">
-                <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                  تعيين كلمة المرور الجديدة *
-                </Label>
-                <div className="relative">
-                  <Input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={e => {
-                      setPassword(e.target.value)
-                      setErrorMessage('')
-                    }}
-                    placeholder="اختر كلمة مرور قوية"
-                    className="h-12 bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm font-semibold pl-10 focus:border-blue-500 font-mono"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute left-3.5 top-3.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
-                  >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
+                <div className="absolute left-3.5 top-3.5 text-slate-400 pointer-events-none">
+                  <User className="w-5 h-5" />
                 </div>
               </div>
+            </div>
 
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full h-12 text-base font-black bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-xl shadow-lg shadow-blue-600/30 transition-all cursor-pointer mt-2"
+            <div className="space-y-1.5 text-right">
+              <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                كلمة المرور
+              </Label>
+              <div className="relative">
+                <Input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => {
+                    setPassword(e.target.value)
+                    setErrorMessage('')
+                  }}
+                  placeholder="••••••••••••"
+                  className="h-12 bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm font-semibold pl-10 pr-10 focus:border-blue-500 font-mono"
+                />
+                <div className="absolute right-3.5 top-3.5 text-slate-400 pointer-events-none">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute left-3.5 top-3.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="text-right">
+              <button
+                type="button"
+                onClick={() => toast.info('يرجى مراجعة مدير النظام لإعادة تعيين بيانات الحساب أو كلمة المرور.')}
+                className="text-xs font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 hover:underline cursor-pointer"
               >
-                {isSubmitting ? 'جاري الإنشاء...' : 'إنشاء حساب المدير'}
-              </Button>
-            </form>
-          )}
+                نسيت كلمة المرور؟
+              </button>
+            </div>
 
-          {/* Toggle Mode */}
-          <div className="text-center pt-2 border-t border-slate-100 dark:border-slate-800">
-            {mode === 'login' ? (
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                ليس لديك حساب؟{' '}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode('register')
-                    setErrorMessage('')
-                  }}
-                  className="font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
-                >
-                  إنشاء حساب جديد
-                </button>
-              </p>
-            ) : (
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                لديك حساب بالفعل؟{' '}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode('login')
-                    setErrorMessage('')
-                  }}
-                  className="font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
-                >
-                  تسجيل الدخول
-                </button>
-              </p>
-            )}
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full h-12 text-base font-black bg-[#1d63ed] hover:bg-blue-700 active:bg-blue-800 text-white rounded-xl shadow-lg shadow-blue-600/30 transition-all cursor-pointer mt-2"
+            >
+              {isSubmitting ? 'جاري تسجيل الدخول...' : 'تسجيل الدخول'}
+            </Button>
+          </form>
+
+          {/* Enterprise Security Note */}
+          <div className="text-center pt-3 border-t border-slate-100 dark:border-slate-800">
+            <p className="text-[11px] font-semibold text-slate-400 flex items-center justify-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+              منظومة إدارية مغلقة ومحمية — يتم منح الصلاحيات عبر الإدارة
+            </p>
           </div>
 
         </div>
       </div>
 
-      {/* ─── 2. Right Section (Dark Royal Navy Blue Showcase matching Image 3) ─── */}
-      <div className="w-full lg:w-1/2 bg-gradient-to-br from-[#0c234a] via-[#0f2d5e] to-[#0a1936] text-white flex flex-col items-center justify-between p-8 sm:p-12 lg:p-16 text-center order-1 lg:order-2 border-b lg:border-b-0 lg:border-r border-blue-900/40">
+      {/* ─── 2. Deep Royal Navy Blue Showcase (LEFT Side in RTL layout - Matches Image 3) ─── */}
+      <div className="w-full lg:w-1/2 bg-gradient-to-br from-[#0c234a] via-[#0f2d5e] to-[#0a1936] text-white flex flex-col items-center justify-between p-8 sm:p-12 lg:p-16 text-center border-t lg:border-t-0 lg:border-r border-blue-900/40">
         
         {/* Top/Center Branding Content */}
         <div className="w-full max-w-lg my-auto space-y-6">
@@ -346,7 +206,7 @@ export default function LoginPage() {
               منظومة الإدارة الشاملة
             </h2>
             <p className="text-sm sm:text-base font-semibold text-blue-200">
-              {getBusinessSubTitle()}
+              نظام إدارة الأنشطة التجارية المتكامل
             </p>
           </div>
 
@@ -357,11 +217,11 @@ export default function LoginPage() {
                 <Sparkles className="w-4 h-4" />
               </div>
               <h3 className="text-base font-black text-white">
-                {businessType === 'pharmacy' ? 'نظام إدارة الصيدليات المتطور' : 'نظام إدارة المنشآت المتطور'}
+                نظام إدارة متطور
               </h3>
             </div>
             <p className="text-xs font-semibold text-blue-100/90 leading-relaxed">
-              الجيل القادم من حلول إدارة العمليات، صمم خصيصاً ليناسب احتياجاتك بدقة وسرعة وأمان فائق.
+              الجيل القادم من حلول إدارة العمليات والمبيعات، صمم خصيصاً ليناسب احتياجاتك بدقة وسرعة وأمان فائق.
             </p>
           </div>
 

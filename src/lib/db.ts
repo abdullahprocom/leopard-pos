@@ -122,7 +122,7 @@ class LeopardDatabase extends Dexie {
   constructor() {
     super('LeopardPOS')
 
-    this.version(4).stores({
+    this.version(5).stores({
       // Foundation
       stores: 'id, owner_id, created_at',
       branches: 'id, store_id, code, is_default, created_at',
@@ -159,7 +159,7 @@ class LeopardDatabase extends Dexie {
       stock_transfer_lines: 'id, store_id, transfer_id, item_id',
 
       // RBAC
-      employees: 'id, store_id, auth_user_id, role_id, created_at',
+      employees: 'id, store_id, email, name, role_id, status, created_at',
       roles: 'id, store_id, name, created_at',
       role_permissions: 'id, role_id, [resource_type+resource_key]',
 
