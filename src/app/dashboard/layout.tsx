@@ -69,7 +69,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false)
   const [isCalcOpen, setIsCalcOpen] = useState(false)
   const { storeName, businessType, isActivated } = useStore()
-  const { currentUser, role, roleLabel, logout, isAdmin, isCashier, isSupervisor } = useAuth()
+  const { currentUser, isLoading, role, roleLabel, logout, isAdmin, isCashier, isSupervisor } = useAuth()
+
+  // Route protection
+  useEffect(() => {
+    if (!isLoading && !currentUser) {
+      router.replace('/login')
+    }
+  }, [isLoading, currentUser, router])
 
   // Auto-close mobile drawer on route change
   useEffect(() => {
@@ -87,6 +94,15 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
   }, [])
+
+  if (isLoading || !currentUser) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white space-y-4" dir="rtl">
+        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm font-bold text-slate-400">جاري التحقق من هوية وصلاحيات المستخدم...</p>
+      </div>
+    )
+  }
 
   const businessTypeLabels: Record<string, string> = {
     supermarket: 'سوبر ماركت',
@@ -273,13 +289,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 </p>
               </div>
 
-              <Link
-                href="/login"
+              <button
+                type="button"
+                onClick={logout}
                 className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
-                title="تبديل المستخدم / تسجيل الخروج"
+                title="تسجيل الخروج"
               >
                 <LogOut className="w-3.5 h-3.5" />
-              </Link>
+              </button>
             </div>
 
             <OnlineStatus />

@@ -292,7 +292,7 @@ export default function DashboardPage() {
           <div>
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-xl sm:text-2xl font-black tracking-tight" suppressHydrationWarning>
-                أهلاً بك، {currentUser.name}
+                أهلاً بك، {currentUser?.name || 'مستخدم النظام'}
               </h1>
               <span className="inline-flex items-center gap-1.5 bg-white/20 text-white text-xs font-black px-3 py-1 rounded-full border border-white/30 backdrop-blur-sm shadow-xs" suppressHydrationWarning>
                 {businessType === 'clothing' ? (
@@ -311,7 +311,7 @@ export default function DashboardPage() {
             <p className="text-blue-200 text-xs sm:text-sm font-semibold mt-1 flex flex-wrap items-center gap-3" suppressHydrationWarning>
               <span className="flex items-center gap-1 font-bold text-white">
                 <Building2 className="w-3.5 h-3.5 text-blue-300" />
-                {currentUser.branchName || 'الفرع الرئيسي'}
+                {currentUser?.branchName || 'الفرع الرئيسي'}
               </span>
               <span>•</span>
               <span className="flex items-center gap-1">

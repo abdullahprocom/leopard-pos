@@ -94,7 +94,7 @@ export default function ExpensesPage() {
       amount: numAmount,
       description: description.trim() || catObj?.name || 'سند صرف مصروفات',
       payment_method: paymentMethod,
-      created_by: currentUser.name,
+      created_by: currentUser?.name || 'المدير',
       created_at: new Date().toISOString(),
     }
 

@@ -4,18 +4,17 @@ import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
   ShieldCheck, 
-  Crown, 
-  UserCheck, 
-  CreditCard, 
   Lock, 
-  ArrowLeft, 
-  Sparkles, 
-  Building2, 
+  Mail, 
+  KeyRound, 
+  Eye, 
+  EyeOff, 
   Store,
-  KeyRound,
-  CheckCircle2
+  CheckCircle2,
+  LogIn,
+  AlertCircle
 } from 'lucide-react'
-import { useAuth, PRESET_USERS, AuthUser } from '@/lib/auth-context'
+import { useAuth, DEFAULT_ADMIN } from '@/lib/auth-context'
 import { useStore } from '@/lib/store-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,55 +24,52 @@ import { toast } from 'sonner'
 
 export default function LoginPage() {
   const router = useRouter()
-  const { loginAs, currentUser } = useAuth()
+  const { login } = useAuth()
   const { storeName, businessType } = useStore()
 
-  const [username, setUsername] = useState('')
-  const [pin, setPin] = useState('')
-  const [selectedPreset, setSelectedPreset] = useState<string>('admin')
+  const [identifier, setIdentifier] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
 
-  const handleQuickLogin = (user: AuthUser) => {
-    loginAs(user)
-    toast.success(`مرحباً بك يا ${user.name} - تم تسجيل الدخول بصلاحيات (${user.role === 'admin' ? 'مدير النظام' : user.role === 'supervisor' ? 'المشرف' : 'الكاشير'})`)
-    if (user.role === 'cashier') {
-      router.push('/dashboard/pos')
-    } else {
-      router.push('/dashboard')
-    }
-  }
-
-  const handleManualLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    const targetUser = PRESET_USERS.find(u => u.username.toLowerCase() === username.trim().toLowerCase())
-    if (targetUser) {
-      loginAs(targetUser)
-      toast.success(`تم تسجيل الدخول بنجاح كـ ${targetUser.name}`)
-      if (targetUser.role === 'cashier') {
-        router.push('/dashboard/pos')
-      } else {
+    setErrorMessage('')
+
+    if (!identifier.trim()) {
+      setErrorMessage('يرجى إدخال البريد الإلكتروني أو اسم المستخدم')
+      return
+    }
+    if (!password.trim()) {
+      setErrorMessage('يرجى إدخال كلمة المرور أو رمز PIN')
+      return
+    }
+
+    try {
+      setIsSubmitting(true)
+      const res = await login(identifier.trim(), password.trim())
+      if (res.success) {
+        toast.success('تم التحقق وتسجيل الدخول بنجاح')
         router.push('/dashboard')
+      } else {
+        setErrorMessage(res.error || 'بيانات الدخول غير صحيحة')
+        toast.error(res.error || 'فشل تسجيل الدخول')
       }
-    } else {
-      // Default to admin with custom entered name
-      const customUser: AuthUser = {
-        id: crypto.randomUUID(),
-        username: username.trim() || 'user',
-        name: username.trim() || 'مستخدم النظام',
-        role: 'admin',
-        branchName: 'الفرع الرئيسي',
-      }
-      loginAs(customUser)
-      toast.success(`تم تسجيل الدخول كـ ${customUser.name}`)
-      router.push('/dashboard')
+    } catch (err: any) {
+      setErrorMessage('حدث خطأ غير متوقع: ' + err.message)
+      toast.error('حدث خطأ أثناء الاتصال')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white flex flex-col justify-center items-center p-4 sm:p-6" dir="rtl">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white flex flex-col justify-center items-center p-4 sm:p-6 select-none" dir="rtl">
       {/* Background ambient glow */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="w-full max-w-4xl z-10 space-y-8">
+      <div className="w-full max-w-md z-10 space-y-6">
         {/* Brand & Store Header */}
         <div className="text-center space-y-3">
           <div className="inline-flex items-center gap-3 bg-white/5 border border-white/10 px-5 py-2.5 rounded-2xl backdrop-blur-md shadow-xl">
@@ -87,149 +83,103 @@ export default function LoginPage() {
               </p>
             </div>
           </div>
-          <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white">
-            تسجيل الدخول وإدارة الصلاحيات
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+            تسجيل الدخول للنظام
           </h1>
-          <p className="text-sm font-semibold text-slate-400 max-w-md mx-auto">
-            اختر دور المستخدم للدخول السريع أو أدخل بيانات الحساب للمتابعة
+          <p className="text-xs sm:text-sm font-semibold text-slate-400">
+            أدخل البريد الإلكتروني وكلمة المرور للوصول لحسابك وصلاحياتك
           </p>
         </div>
 
-        {/* 1-Click Quick Role Switch Cards (Evaluator & Demo Ready) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Admin Card */}
-          <div
-            onClick={() => handleQuickLogin(PRESET_USERS[0])}
-            className="group relative bg-gradient-to-b from-purple-900/30 to-slate-900/80 hover:from-purple-900/50 hover:to-slate-900 border-2 border-purple-500/30 hover:border-purple-500 rounded-3xl p-6 transition-all duration-200 cursor-pointer shadow-xl hover:shadow-purple-500/20 hover:-translate-y-1"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 rounded-2xl bg-purple-500/20 text-purple-300 flex items-center justify-center border border-purple-500/30 group-hover:scale-110 transition-transform">
-                <Crown className="w-6 h-6" />
-              </div>
-              <span className="text-[11px] font-black bg-purple-500/20 text-purple-300 border border-purple-500/30 px-3 py-1 rounded-full">
-                كامل الصلاحيات
-              </span>
-            </div>
-            <h3 className="text-lg font-black text-white group-hover:text-purple-200">
-              مدير النظام (Admin)
-            </h3>
-            <p className="text-xs font-semibold text-slate-400 mt-1 leading-relaxed">
-              إدارة الأرباح، التكاليف، إعدادات النشاط، شجرة الحسابات والمستخدمين.
-            </p>
-            <Button
-              type="button"
-              className="w-full mt-5 bg-purple-600 hover:bg-purple-500 text-white font-black rounded-xl h-11 shadow-md shadow-purple-600/30 cursor-pointer"
-            >
-              دخول كـ مدير النظام
-              <ArrowLeft className="w-4 h-4 mr-2" />
-            </Button>
-          </div>
-
-          {/* Supervisor Card */}
-          <div
-            onClick={() => handleQuickLogin(PRESET_USERS[1])}
-            className="group relative bg-gradient-to-b from-emerald-900/30 to-slate-900/80 hover:from-emerald-900/50 hover:to-slate-900 border-2 border-emerald-500/30 hover:border-emerald-500 rounded-3xl p-6 transition-all duration-200 cursor-pointer shadow-xl hover:shadow-emerald-500/20 hover:-translate-y-1"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center border border-emerald-500/30 group-hover:scale-110 transition-transform">
-                <ShieldCheck className="w-6 h-6" />
-              </div>
-              <span className="text-[11px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-3 py-1 rounded-full">
-                إشراف وتشغيل
-              </span>
-            </div>
-            <h3 className="text-lg font-black text-white group-hover:text-emerald-200">
-              المشرف (Supervisor)
-            </h3>
-            <p className="text-xs font-semibold text-slate-400 mt-1 leading-relaxed">
-              إدارة المخزون، المشتريات، الموردين، الجرد المخزني ومتابعة المبيعات.
-            </p>
-            <Button
-              type="button"
-              className="w-full mt-5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-xl h-11 shadow-md shadow-emerald-600/30 cursor-pointer"
-            >
-              دخول كـ مشرف
-              <ArrowLeft className="w-4 h-4 mr-2" />
-            </Button>
-          </div>
-
-          {/* Cashier Card */}
-          <div
-            onClick={() => handleQuickLogin(PRESET_USERS[2])}
-            className="group relative bg-gradient-to-b from-blue-900/30 to-slate-900/80 hover:from-blue-900/50 hover:to-slate-900 border-2 border-blue-500/30 hover:border-blue-500 rounded-3xl p-6 transition-all duration-200 cursor-pointer shadow-xl hover:shadow-blue-500/20 hover:-translate-y-1"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 rounded-2xl bg-blue-500/20 text-blue-300 flex items-center justify-center border border-blue-500/30 group-hover:scale-110 transition-transform">
-                <CreditCard className="w-6 h-6" />
-              </div>
-              <span className="text-[11px] font-black bg-blue-500/20 text-blue-300 border border-blue-500/30 px-3 py-1 rounded-full">
-                نقطة البيع فقط
-              </span>
-            </div>
-            <h3 className="text-lg font-black text-white group-hover:text-blue-200">
-              الكاشير (Cashier)
-            </h3>
-            <p className="text-xs font-semibold text-slate-400 mt-1 leading-relaxed">
-              شاشة نقطة البيع السريعة (POS)، فواتير المبيعات، ومرتجعات العملاء فقط.
-            </p>
-            <Button
-              type="button"
-              className="w-full mt-5 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-xl h-11 shadow-md shadow-blue-600/30 cursor-pointer"
-            >
-              دخول كـ كاشير (POS)
-              <ArrowLeft className="w-4 h-4 mr-2" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Manual Login Form */}
-        <Card className="bg-slate-900/90 border-slate-800 shadow-2xl rounded-3xl backdrop-blur-md max-w-lg mx-auto">
-          <CardHeader className="text-center pb-2">
+        {/* Commercial Secure Login Form */}
+        <Card className="bg-slate-900/90 border-slate-800 shadow-2xl rounded-3xl backdrop-blur-md">
+          <CardHeader className="text-center pb-3">
             <CardTitle className="text-base font-black text-white flex items-center justify-center gap-2">
-              <KeyRound className="w-4 h-4 text-blue-400" />
-              أو تسجيل الدخول اليدوي
+              <Lock className="w-4 h-4 text-blue-400" />
+              بوابة الدخول الموحدة
             </CardTitle>
             <CardDescription className="text-xs font-semibold text-slate-400">
-              أدخل اسم المستخدم أو رمز PIN للتحقق
+              الوصول مشفر ومحمي حسب صلاحيات كل مستخدم
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleManualLogin} className="space-y-4">
+            {errorMessage && (
+              <div className="mb-4 p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-bold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-1.5 text-right">
-                <Label className="text-xs font-bold text-slate-300">اسم المستخدم (admin / supervisor / cashier)</Label>
+                <Label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <Mail className="w-3.5 h-3.5 text-blue-400" />
+                  البريد الإلكتروني أو اسم المستخدم
+                </Label>
                 <Input
-                  value={username}
-                  onChange={e => setUsername(e.target.value)}
-                  placeholder="مثال: admin"
-                  className="h-12 bg-slate-950/80 border-slate-800 text-white rounded-xl text-base font-bold"
+                  value={identifier}
+                  onChange={e => {
+                    setIdentifier(e.target.value)
+                    setErrorMessage('')
+                  }}
+                  placeholder="admin@erp.com أو اسم المستخدم"
+                  className="h-12 bg-slate-950/80 border-slate-800 text-white rounded-xl text-sm font-bold placeholder:text-slate-600 focus:border-blue-500"
+                  autoFocus
                 />
               </div>
 
               <div className="space-y-1.5 text-right">
-                <Label className="text-xs font-bold text-slate-300">رمز المرور أو الـ PIN</Label>
-                <Input
-                  type="password"
-                  value={pin}
-                  onChange={e => setPin(e.target.value)}
-                  placeholder="••••"
-                  className="h-12 bg-slate-950/80 border-slate-800 text-white rounded-xl text-base font-bold text-center tracking-widest"
-                />
+                <Label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <KeyRound className="w-3.5 h-3.5 text-blue-400" />
+                  كلمة المرور / الرمز السري (PIN)
+                </Label>
+                <div className="relative">
+                  <Input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={e => {
+                      setPassword(e.target.value)
+                      setErrorMessage('')
+                    }}
+                    placeholder="••••••••"
+                    className="h-12 bg-slate-950/80 border-slate-800 text-white rounded-xl text-sm font-bold pl-10 placeholder:text-slate-600 focus:border-blue-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute left-3 top-3.5 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
               </div>
 
               <Button
                 type="submit"
-                className="w-full h-12 text-base font-black bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-lg shadow-blue-600/30 cursor-pointer"
+                disabled={isSubmitting}
+                className="w-full h-12 text-base font-black bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-lg shadow-blue-600/30 transition-all cursor-pointer flex items-center justify-center gap-2 mt-2"
               >
-                تسجيل الدخول للمنظومة
+                <LogIn className="w-5 h-5" />
+                {isSubmitting ? 'جاري التحقق...' : 'تسجيل الدخول'}
               </Button>
             </form>
+
+            {/* Admin Initial Access Note */}
+            <div className="mt-5 p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-[11px] text-slate-400 leading-relaxed font-semibold">
+              <div className="flex items-center gap-1.5 text-blue-400 font-bold mb-1">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>بيانات الحساب الرئيسي للنظام:</span>
+              </div>
+              <p>البريد: <strong className="text-slate-200 font-mono">admin@erp.com</strong> | كلمة المرور: <strong className="text-slate-200 font-mono">admin123</strong></p>
+              <p className="text-[10px] text-slate-500 mt-0.5">يمكنك إضافة وتعديل كاشيرات وموظفي الفرع من شاشة "الموظفين والصلاحيات".</p>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Footer info */}
+        {/* Security Footer */}
         <div className="text-center text-xs font-bold text-slate-500 flex items-center justify-center gap-2">
           <ShieldCheck className="w-4 h-4 text-emerald-500" />
-          منظومة مشفرة تعمل بنظام Offline-First مع إمكانية التبديل اللحظي بين الفروع
+          نظام محمي ومشفر بالكامل مع عزل تام لصلاحيات كل موظف
         </div>
       </div>
     </div>
