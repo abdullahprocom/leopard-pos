@@ -53,6 +53,7 @@
   }
 
   body {
+    font-family: var(--font-cairo), 'Cairo', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background-color: var(--background);
     color: var(--foreground);
     font-feature-settings: "rlig" 1, "calt" 1;

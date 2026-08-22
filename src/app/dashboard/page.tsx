@@ -33,6 +33,9 @@ import {
   Clock,
   ArrowUpRight,
   ArrowDownRight,
+  Pill,
+  Shirt,
+  Utensils,
 } from 'lucide-react'
 import {
   AreaChart,
@@ -276,8 +279,18 @@ export default function DashboardPage() {
         <div>
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight" suppressHydrationWarning>{storeName}</h1>
-            <span className="bg-white/20 text-white text-xs font-black px-3 py-1 rounded-full border border-white/30 backdrop-blur-sm shadow-xs" suppressHydrationWarning>
-              {businessType === 'clothing' ? '👗 نشاط الملابس والأحذية' : businessType === 'pharmacy' ? '💊 نشاط الصيدلية' : businessType === 'supermarket' ? '🛒 نشاط السوبرماركت' : businessType === 'restaurant' ? '🍔 نشاط المطاعم' : '🏢 تجارة عامة'}
+            <span className="inline-flex items-center gap-1.5 bg-white/20 text-white text-xs font-black px-3 py-1 rounded-full border border-white/30 backdrop-blur-sm shadow-xs" suppressHydrationWarning>
+              {businessType === 'clothing' ? (
+                <><Shirt className="w-3.5 h-3.5 text-pink-200" /><span>نشاط الملابس والأحذية</span></>
+              ) : businessType === 'pharmacy' ? (
+                <><Pill className="w-3.5 h-3.5 text-emerald-200" /><span>نشاط الصيدلية والمستلزمات</span></>
+              ) : businessType === 'supermarket' ? (
+                <><ShoppingCart className="w-3.5 h-3.5 text-amber-200" /><span>نشاط السوبر ماركت والبقالة</span></>
+              ) : businessType === 'restaurant' ? (
+                <><Utensils className="w-3.5 h-3.5 text-orange-200" /><span>نشاط المطاعم والكافيهات</span></>
+              ) : (
+                <><Building2 className="w-3.5 h-3.5 text-blue-200" /><span>تجارة عامة ومخازن</span></>
+              )}
             </span>
           </div>
           <p className="text-blue-100 text-sm font-semibold mt-1 flex items-center gap-2" suppressHydrationWarning>
