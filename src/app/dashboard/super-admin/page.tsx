@@ -3,16 +3,14 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/lib/db'
-import { useStore } from '@/lib/store-context'
 import { generateLicenseToken, toggleStoreStatus } from '@/lib/license-service'
-import { resolveSystemError } from '@/lib/logger'
-import { runFullSystemBenchmark, BenchmarkReport } from '@/lib/benchmark'
-import type { BusinessType, LicenseDuration, LicenseToken, SystemErrorLog, TenantStoreRecord } from '@/lib/types'
+import { resolveSystemError, logSystemError } from '@/lib/logger'
+import type { BusinessType, LicenseDuration, LicenseToken, SystemErrorLog, TenantStoreRecord, ErrorSeverity } from '@/lib/types'
 import { 
-  ShieldAlert, Key, Users, Building2, Terminal, AlertTriangle, 
-  CheckCircle2, Clock, Play, Download, Copy, Check, Eye, X, 
-  RefreshCw, Power, Server, Cpu, HardDrive, Wifi, Sparkles, Filter, 
-  Search, FileText
+  ShieldAlert, Key, Building2, Terminal, AlertTriangle, 
+  CheckCircle2, Clock, Download, Copy, Check, Eye, X, 
+  Power, Server, Search, FileText, CheckCircle, Bug,
+  Activity, Laptop, RefreshCw, Trash2, ArrowUpRight
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,8 +18,35 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
 
+// Export error logs to CSV
+function exportErrorsToCSV(logs: SystemErrorLog[]) {
+  if (logs.length === 0) {
+    toast.error('لا توجد سجلات أخطاء للتصدير')
+    return
+  }
+  const headers = ['معرف الخطأ', 'اسم المتجر', 'درجة الخطورة', 'الرسالة', 'الصفحة', 'نظام العميل', 'المتصفح', 'الوقت', 'الحالة']
+  const rows = logs.map(l => [
+    l.id.slice(0, 8),
+    l.store_name || 'متجر غير محدد',
+    l.severity,
+    (l.message || '').replace(/"/g, '""'),
+    l.page_url,
+    l.os_info || '—',
+    l.browser_info || '—',
+    new Date(l.created_at).toLocaleString('ar-EG'),
+    l.resolved ? 'تم الحل' : 'قيد الفحص'
+  ])
+  const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.map(c => `"${c}"`).join(','))].join('\n')
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = `system_error_logs_${new Date().toISOString().slice(0, 10)}.csv`
+  link.click()
+  toast.success('تم تصدير تقرير الأخطاء بنجاح')
+}
+
 export default function SuperAdminPage() {
-  const [activeTab, setActiveTab] = useState<'stores' | 'tokens' | 'errors' | 'benchmark'>('stores')
+  const [activeTab, setActiveTab] = useState<'errors' | 'stores' | 'tokens'>('errors')
 
   // ─── Token Generator Form State ───
   const [tokenType, setTokenType] = useState<BusinessType>('pharmacy')
@@ -32,15 +57,14 @@ export default function SuperAdminPage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [copiedToken, setCopiedToken] = useState<string | null>(null)
 
-  // ─── Filters & Search ───
-  const [storeSearch, setStoreSearch] = useState('')
+  // ─── Errors & Telemetry Filter State ───
   const [errorSearch, setErrorSearch] = useState('')
   const [errorSeverityFilter, setErrorSeverityFilter] = useState<string>('all')
+  const [errorStatusFilter, setErrorStatusFilter] = useState<'all' | 'unresolved' | 'resolved'>('all')
   const [selectedError, setSelectedError] = useState<SystemErrorLog | null>(null)
 
-  // ─── Benchmark State ───
-  const [benchmarkReport, setBenchmarkReport] = useState<BenchmarkReport | null>(null)
-  const [isRunningBenchmark, setIsRunningBenchmark] = useState(false)
+  // ─── Stores Search State ───
+  const [storeSearch, setStoreSearch] = useState('')
 
   // ─── Database Live Queries ───
   const tokens = useLiveQuery(
@@ -55,35 +79,71 @@ export default function SuperAdminPage() {
     () => db.system_error_logs.reverse().sortBy('created_at')
   ) || []
 
-  // Seed default sample tenant store if empty
+  // Seed sample data if database is fresh
   useEffect(() => {
     async function seedDefaults() {
       const storeCount = await db.tenant_stores.count()
       if (storeCount === 0) {
-        const sample: TenantStoreRecord = {
-          id: crypto.randomUUID(),
+        const sampleStore: TenantStoreRecord = {
+          id: 'store-demo-01',
           store_name: 'صيدلية النور الحديثة',
           owner_name: 'د. أحمد مصطفى',
           owner_phone: '01012345678',
           business_type: 'pharmacy',
           status: 'active',
           token: 'ERP-2026-PHARM-Y01-A99K-8822',
-          created_at: new Date(Date.now() - 10 * 86400000).toISOString(),
-          expires_at: new Date(Date.now() + 355 * 86400000).toISOString(),
+          created_at: new Date(Date.now() - 12 * 86400000).toISOString(),
+          expires_at: new Date(Date.now() + 353 * 86400000).toISOString(),
           last_active_at: new Date().toISOString(),
-          total_items: 420,
-          total_sales_count: 1560,
-          total_revenue: 89400
+          total_items: 520,
+          total_sales_count: 1840,
+          total_revenue: 124500
         }
-        await db.tenant_stores.put(sample)
+        await db.tenant_stores.put(sampleStore)
+      }
+
+      const logCount = await db.system_error_logs.count()
+      if (logCount === 0) {
+        const sampleLogs: SystemErrorLog[] = [
+          {
+            id: 'err-sample-01',
+            store_id: 'store-demo-01',
+            store_name: 'صيدلية النور الحديثة',
+            user_role: 'cashier',
+            severity: 'error',
+            message: 'TypeError: Cannot read properties of undefined (reading "barcode")',
+            stack_trace: 'TypeError: Cannot read properties of undefined (reading "barcode")\n    at handleScanBarcode (pos/page.tsx:142:18)\n    at HTMLInputElement.onKeyDown (pos/page.tsx:210:9)',
+            page_url: '/dashboard/pos',
+            browser_info: 'Chrome 80.0',
+            os_info: 'Windows 7 (Legacy)',
+            is_online: true,
+            resolved: false,
+            created_at: new Date(Date.now() - 35 * 60000).toISOString()
+          },
+          {
+            id: 'err-sample-02',
+            store_id: '00000000-0000-0000-0001-000000000001',
+            store_name: 'سوبر ماركت الهدى',
+            user_role: 'admin',
+            severity: 'network',
+            message: 'SyncEngine: Offline deferred batch write - network timeout',
+            stack_trace: 'FetchError: Failed to fetch Supabase sync endpoint\n    at SyncEngine.processQueue (sync-engine.ts:208:14)',
+            page_url: '/dashboard/items',
+            browser_info: 'Firefox 95.0',
+            os_info: 'Windows 10',
+            is_online: false,
+            resolved: true,
+            resolved_at: new Date(Date.now() - 10 * 60000).toISOString(),
+            resolved_by: 'Super Admin Support',
+            created_at: new Date(Date.now() - 180 * 60000).toISOString()
+          }
+        ]
+        for (const log of sampleLogs) {
+          await db.system_error_logs.put(log)
+        }
       }
     }
     seedDefaults()
-  }, [])
-
-  // Auto-run benchmark on first load
-  useEffect(() => {
-    handleRunBenchmark()
   }, [])
 
   // Handle Token Generation
@@ -117,21 +177,25 @@ export default function SuperAdminPage() {
     setTimeout(() => setCopiedToken(null), 2500)
   }
 
-  // Handle Benchmark Run
-  const handleRunBenchmark = async () => {
-    setIsRunningBenchmark(true)
-    try {
-      const report = await runFullSystemBenchmark()
-      setBenchmarkReport(report)
-      toast.success('تم إكمال اختبار السرعة والأداء بنجاح!')
-    } catch (err: any) {
-      toast.error('حدث خطأ أثناء فحص الأداء: ' + err.message)
-    } finally {
-      setIsRunningBenchmark(false)
-    }
-  }
+  // Filtered Telemetry Logs
+  const filteredErrors = useMemo(() => {
+    return errorLogs.filter(err => {
+      const q = errorSearch.toLowerCase()
+      const matchesSearch = (err.message || '').toLowerCase().includes(q) ||
+        (err.store_name || '').toLowerCase().includes(q) ||
+        (err.page_url || '').toLowerCase().includes(q) ||
+        (err.os_info || '').toLowerCase().includes(q)
+      
+      const matchesSeverity = errorSeverityFilter === 'all' || err.severity === errorSeverityFilter
+      const matchesStatus = errorStatusFilter === 'all' || 
+        (errorStatusFilter === 'unresolved' && !err.resolved) ||
+        (errorStatusFilter === 'resolved' && err.resolved)
 
-  // Filtered Lists
+      return matchesSearch && matchesSeverity && matchesStatus
+    })
+  }, [errorLogs, errorSearch, errorSeverityFilter, errorStatusFilter])
+
+  // Filtered Stores
   const filteredStores = useMemo(() => {
     return tenantStores.filter(s =>
       s.store_name.toLowerCase().includes(storeSearch.toLowerCase()) ||
@@ -140,23 +204,16 @@ export default function SuperAdminPage() {
     )
   }, [tenantStores, storeSearch])
 
-  const filteredErrors = useMemo(() => {
-    return errorLogs.filter(err => {
-      const matchesSearch = (err.message || '').toLowerCase().includes(errorSearch.toLowerCase()) ||
-        (err.store_name || '').toLowerCase().includes(errorSearch.toLowerCase()) ||
-        (err.page_url || '').toLowerCase().includes(errorSearch.toLowerCase())
-      const matchesSeverity = errorSeverityFilter === 'all' || err.severity === errorSeverityFilter
-      return matchesSearch && matchesSeverity
-    })
-  }, [errorLogs, errorSearch, errorSeverityFilter])
+  // Unresolved Errors Count
+  const unresolvedCount = errorLogs.filter(e => !e.resolved).length
 
   return (
     <div className="space-y-4 pb-16 select-none w-full" dir="rtl">
       {/* ── Header Banner ── */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950 p-6 rounded-3xl border border-indigo-900/40 shadow-xl text-white">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400 shadow-lg">
-            <Server className="w-7 h-7" />
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950 p-5 rounded-3xl border border-indigo-900/40 shadow-xl text-white">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400 shadow-lg">
+            <Server className="w-6 h-6" />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -167,27 +224,47 @@ export default function SuperAdminPage() {
                 إدارة المنظومة
               </span>
             </div>
-            <p className="text-xs text-slate-300 mt-1">
-              التحكم في تراخيص واشتراكات المتاجر، مراقبة الأخطاء عن بُعد، واختبار كفاءة الأجهزة الضعيفة
+            <p className="text-xs text-slate-300 mt-0.5">
+              نظام تتبع الأخطاء والتليمتري الصامت للمتاجر، وإدارة التراخيص والاشتراكات
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
           <Button
-            onClick={handleRunBenchmark}
-            disabled={isRunningBenchmark}
-            className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black h-10 px-4 rounded-xl gap-1.5 shadow-lg shadow-indigo-600/30 cursor-pointer"
+            onClick={() => exportErrorsToCSV(filteredErrors)}
+            variant="outline"
+            className="border-indigo-800/80 bg-slate-900/80 text-indigo-300 hover:text-white text-xs font-bold h-10 px-4 rounded-xl gap-1.5 cursor-pointer"
           >
-            <Cpu className="w-4 h-4" />
-            {isRunningBenchmark ? 'جاري الفحص...' : 'فحص الأداء والسرعة'}
+            <Download className="w-4 h-4" />
+            تصدير تقرير الأخطاء (CSV)
           </Button>
         </div>
       </div>
 
       {/* ── Top Metrics ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="flex items-center gap-3.5 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+        {/* Unresolved Errors */}
+        <div 
+          onClick={() => { setActiveTab('errors'); setErrorStatusFilter('unresolved') }}
+          className="flex items-center gap-3.5 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs cursor-pointer hover:border-rose-400 transition-colors"
+        >
+          <div className="w-10 h-10 rounded-xl bg-rose-500/15 border border-rose-500/25 flex items-center justify-center text-rose-500">
+            <ShieldAlert className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-2xl font-black text-rose-600 dark:text-rose-400 leading-none font-mono">
+              {unresolvedCount}
+            </p>
+            <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mt-1">أخطاء حرجة قيد المتابعة</p>
+          </div>
+        </div>
+
+        {/* Subscribed Stores */}
+        <div 
+          onClick={() => setActiveTab('stores')}
+          className="flex items-center gap-3.5 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs cursor-pointer hover:border-blue-400 transition-colors"
+        >
           <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-500/25 flex items-center justify-center text-blue-500">
             <Building2 className="w-5 h-5" />
           </div>
@@ -199,39 +276,32 @@ export default function SuperAdminPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3.5 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+        {/* Active Licenses */}
+        <div 
+          onClick={() => setActiveTab('tokens')}
+          className="flex items-center gap-3.5 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs cursor-pointer hover:border-emerald-400 transition-colors"
+        >
           <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center text-emerald-500">
             <Key className="w-5 h-5" />
           </div>
           <div>
             <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 leading-none font-mono">
-              {tokens.length}
+              {tokens.filter(t => t.status === 'active').length}
             </p>
-            <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mt-1">أكواد التراخيص الصادرة</p>
+            <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mt-1">تراخيص فعالة ونشطة</p>
           </div>
         </div>
 
+        {/* System Stability Score */}
         <div className="flex items-center gap-3.5 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-          <div className="w-10 h-10 rounded-xl bg-rose-500/15 border border-rose-500/25 flex items-center justify-center text-rose-500">
-            <ShieldAlert className="w-5 h-5" />
+          <div className="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center text-indigo-500">
+            <Activity className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-2xl font-black text-rose-600 dark:text-rose-400 leading-none font-mono">
-              {errorLogs.filter(e => !e.resolved).length}
+            <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400 leading-none font-mono">
+              99.8%
             </p>
-            <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mt-1">أخطاء حرجة قيد المتابعة</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3.5 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center text-amber-500">
-            <Sparkles className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-2xl font-black text-amber-600 dark:text-amber-400 leading-none font-mono">
-              &lt; 5 ms
-            </p>
-            <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mt-1">زمن استجابة العمليات</p>
+            <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mt-1">معدل استقرار المنظومة</p>
           </div>
         </div>
       </div>
@@ -240,8 +310,26 @@ export default function SuperAdminPage() {
       <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
         <button
           type="button"
+          onClick={() => setActiveTab('errors')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === 'errors'
+              ? 'bg-rose-600 text-white shadow-md shadow-rose-600/20'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Bug className="w-4 h-4" />
+          راصد الأخطاء والتليمتري الصامت ({errorLogs.length})
+          {unresolvedCount > 0 && (
+            <span className="bg-white text-rose-600 font-mono text-[10px] px-1.5 py-0.2 rounded-full font-black">
+              {unresolvedCount}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveTab('stores')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
             activeTab === 'stores'
               ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -254,7 +342,7 @@ export default function SuperAdminPage() {
         <button
           type="button"
           onClick={() => setActiveTab('tokens')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
             activeTab === 'tokens'
               ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -263,35 +351,164 @@ export default function SuperAdminPage() {
           <Key className="w-4 h-4" />
           توليد التراخيص والأكواد ({tokens.length})
         </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('errors')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === 'errors'
-              ? 'bg-rose-600 text-white shadow-md shadow-rose-600/20'
-              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-          }`}
-        >
-          <ShieldAlert className="w-4 h-4" />
-          راصد الأخطاء والتليمتري ({errorLogs.length})
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('benchmark')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === 'benchmark'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-          }`}
-        >
-          <Cpu className="w-4 h-4" />
-          تقرير محاكاة وسرعة الأجهزة (Benchmark)
-        </button>
       </div>
 
-      {/* ═══════ Tab 1: Tenant Stores ═══════ */}
+      {/* ═══════ Tab 1: Silent Error & Bug Logger ═══════ */}
+      {activeTab === 'errors' && (
+        <div className="space-y-4 animate-fadeIn">
+          {/* Search & Filters */}
+          <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row gap-3 items-center justify-between">
+            <div className="relative flex-1 w-full max-w-md">
+              <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+              <Input
+                placeholder="بحث باسم المتجر، رسالة الخطأ، المسار، أو نظام التشغيل..."
+                value={errorSearch}
+                onChange={e => setErrorSearch(e.target.value)}
+                className="pr-10 h-10 text-xs bg-slate-50 dark:bg-slate-800 rounded-xl font-bold"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <div className="w-44">
+                <Select value={errorSeverityFilter} onValueChange={v => setErrorSeverityFilter(v)}>
+                  <SelectTrigger className="h-10 text-xs font-bold bg-slate-50 dark:bg-slate-800 rounded-xl">
+                    <SelectValue placeholder="نوع الخطأ" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl dark:bg-slate-900">
+                    <SelectItem value="all">جميع الأنواع</SelectItem>
+                    <SelectItem value="critical">🚨 أخطاء حرجة (Critical)</SelectItem>
+                    <SelectItem value="error">⚠️ استثناءات (Exceptions)</SelectItem>
+                    <SelectItem value="network">🌐 شبكة ومزامنة (Network)</SelectItem>
+                    <SelectItem value="db">💾 قاعدة بيانات (DB)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="w-36">
+                <Select value={errorStatusFilter} onValueChange={(v: any) => setErrorStatusFilter(v)}>
+                  <SelectTrigger className="h-10 text-xs font-bold bg-slate-50 dark:bg-slate-800 rounded-xl">
+                    <SelectValue placeholder="الحالة" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl dark:bg-slate-900">
+                    <SelectItem value="all">جميع الحالات</SelectItem>
+                    <SelectItem value="unresolved">🔴 قيد المتابعة</SelectItem>
+                    <SelectItem value="resolved">🟢 تم الحل</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          {/* Real-time Telemetry Errors Table */}
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <div>
+                <h3 className="font-black text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                  <Bug className="w-4 h-4 text-rose-500" />
+                  سجل الأخطاء والتليمتري الوارد من المتاجر ({filteredErrors.length})
+                </h3>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  يتم رصد وحفظ هذه الأخطاء تلقائياً من أجهزة العملاء لتمكين الدعم الفني من حلها مسبقاً
+                </p>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-right text-xs border-collapse min-w-[850px]">
+                <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-black">
+                  <tr>
+                    <th className="py-3 px-4">اسم المتجر والفرع</th>
+                    <th className="py-3 px-4">نوع الخطأ</th>
+                    <th className="py-3 px-4">رسالة الخطأ البرمجي</th>
+                    <th className="py-3 px-4">الصفحة / المسار</th>
+                    <th className="py-3 px-4">بيئة العميل (OS & Browser)</th>
+                    <th className="py-3 px-4">وقت الحدوث</th>
+                    <th className="py-3 px-4 text-center">الحالة</th>
+                    <th className="py-3 px-4 text-center w-24">معاينة</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {filteredErrors.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-16 text-center text-slate-400 font-bold">
+                        <CheckCircle className="w-10 h-10 text-emerald-500 mx-auto mb-2 opacity-80" />
+                        <p className="text-sm text-slate-800 dark:text-slate-200">لا توجد أخطاء مسجلة مطابقة للبحث</p>
+                        <p className="text-xs text-slate-400 mt-1">المنظومة تعمل باستقرار تام عبر كافة المتاجر</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredErrors.map(log => (
+                      <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                        <td className="py-3.5 px-4 font-black text-slate-900 dark:text-white">
+                          <p>{log.store_name || 'متجر غير معروف'}</p>
+                          <p className="text-[10px] text-slate-400 font-mono font-normal">{log.store_id.slice(0, 13)}...</p>
+                        </td>
+
+                        <td className="py-3.5 px-4">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full font-bold text-[10px] border ${
+                            log.severity === 'critical'
+                              ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30'
+                              : log.severity === 'db'
+                                ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30'
+                                : log.severity === 'network'
+                                  ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border-cyan-500/30'
+                                  : 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30'
+                          }`}>
+                            {log.severity === 'critical' ? 'حرج' : log.severity === 'db' ? 'قاعدة بيانات' : log.severity === 'network' ? 'شبكة ومزامنة' : 'استثناء'}
+                          </span>
+                        </td>
+
+                        <td className="py-3.5 px-4 max-w-xs truncate font-mono text-slate-800 dark:text-slate-200">
+                          {log.message}
+                        </td>
+
+                        <td className="py-3.5 px-4 font-mono text-[11px] text-blue-600 dark:text-blue-400">
+                          {log.page_url}
+                        </td>
+
+                        <td className="py-3.5 px-4 text-slate-500 text-[11px]">
+                          <p className="font-bold text-slate-700 dark:text-slate-300">{log.os_info || 'Windows'}</p>
+                          <p className="text-[10px] text-slate-400">{log.browser_info || 'Browser'}</p>
+                        </td>
+
+                        <td className="py-3.5 px-4 text-slate-500 text-[11px] font-mono">
+                          {new Date(log.created_at).toLocaleString('ar-EG', {
+                            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                          })}
+                        </td>
+
+                        <td className="py-3.5 px-4 text-center">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full font-bold text-[10px] border ${
+                            log.resolved 
+                              ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border-emerald-300 dark:border-emerald-800' 
+                              : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 border-rose-300 dark:border-rose-800 animate-pulse'
+                          }`}>
+                            {log.resolved ? 'تم الحل' : 'قيد الفحص'}
+                          </span>
+                        </td>
+
+                        <td className="py-3.5 px-4 text-center">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setSelectedError(log)}
+                            className="h-7 px-2.5 text-[10px] font-bold rounded-lg gap-1 border-slate-200 dark:border-slate-700"
+                          >
+                            <Eye className="w-3 h-3" />
+                            التفاصيل
+                          </Button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════ Tab 2: Subscribed Stores ═══════ */}
       {activeTab === 'stores' && (
         <div className="space-y-4 animate-fadeIn">
           {/* Search bar */}
@@ -310,14 +527,14 @@ export default function SuperAdminPage() {
             </p>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
             <table className="w-full text-right text-xs border-collapse">
               <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-black">
                 <tr>
                   <th className="py-3 px-4">اسم المنشأة</th>
                   <th className="py-3 px-4">المالك / الهاتف</th>
                   <th className="py-3 px-4">نوع النشاط</th>
-                  <th className="py-3 px-4">كود الترخيص</th>
+                  <th className="py-3 px-4">كود الترخيص (Token)</th>
                   <th className="py-3 px-4">تاريخ الانتهاء</th>
                   <th className="py-3 px-4 text-center">الحالة</th>
                   <th className="py-3 px-4 text-center w-28">إجراءات</th>
@@ -359,7 +576,7 @@ export default function SuperAdminPage() {
                         variant={st.status === 'active' ? 'outline' : 'default'}
                         onClick={() => toggleStoreStatus(st.id, st.status === 'active' ? 'suspended' : 'active')}
                         className={`h-7 px-2.5 text-[10px] font-bold rounded-lg ${
-                          st.status === 'active' ? 'text-rose-600 hover:bg-rose-50' : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                          st.status === 'active' ? 'text-rose-600 hover:bg-rose-50 border-rose-200' : 'bg-emerald-600 hover:bg-emerald-500 text-white'
                         }`}
                       >
                         <Power className="w-3 h-3 ml-1" />
@@ -374,7 +591,7 @@ export default function SuperAdminPage() {
         </div>
       )}
 
-      {/* ═══════ Tab 2: Token Generator ═══════ */}
+      {/* ═══════ Tab 3: Token Generator ═══════ */}
       {activeTab === 'tokens' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 animate-fadeIn">
           {/* Generator Form */}
@@ -526,222 +743,6 @@ export default function SuperAdminPage() {
         </div>
       )}
 
-      {/* ═══════ Tab 3: Error & Bug Logger Telemetry ═══════ */}
-      {activeTab === 'errors' && (
-        <div className="space-y-4 animate-fadeIn">
-          <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row gap-3 items-center justify-between">
-            <div className="relative flex-1 w-full max-w-md">
-              <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <Input
-                placeholder="بحث في رسائل الخطأ، المنشأة، أو المسار..."
-                value={errorSearch}
-                onChange={e => setErrorSearch(e.target.value)}
-                className="pr-10 h-10 text-xs bg-slate-50 dark:bg-slate-800 rounded-xl font-bold"
-              />
-            </div>
-
-            <div className="w-full md:w-48">
-              <Select value={errorSeverityFilter} onValueChange={v => setErrorSeverityFilter(v)}>
-                <SelectTrigger className="h-10 text-xs font-bold bg-slate-50 dark:bg-slate-800 rounded-xl">
-                  <SelectValue placeholder="درجة الخطورة" />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl dark:bg-slate-900">
-                  <SelectItem value="all">جميع مستويات الخطأ</SelectItem>
-                  <SelectItem value="critical">🚨 أخطاء حرجة (Critical)</SelectItem>
-                  <SelectItem value="error">⚠️ استثناءات (Exceptions)</SelectItem>
-                  <SelectItem value="network">🌐 اتصال وشبكة (Network)</SelectItem>
-                  <SelectItem value="db">💾 قاعدة بيانات (IndexedDB)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
-            <table className="w-full text-right text-xs border-collapse">
-              <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-black">
-                <tr>
-                  <th className="py-3 px-4">درجة الخطورة</th>
-                  <th className="py-3 px-4">المنشأة والبيئة (OS / Browser)</th>
-                  <th className="py-3 px-4">رسالة الخطأ (Message)</th>
-                  <th className="py-3 px-4">الصفحة</th>
-                  <th className="py-3 px-4">الوقت</th>
-                  <th className="py-3 px-4 text-center">الحالة</th>
-                  <th className="py-3 px-4 text-center w-24">معاينة</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {filteredErrors.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-12 text-center text-slate-400 font-bold">
-                      <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2 opacity-80" />
-                      لا توجد أخطاء مسجلة، المنظومة تعمل باستقرار 100%
-                    </td>
-                  </tr>
-                ) : (
-                  filteredErrors.map(log => (
-                    <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                      <td className="py-3 px-4">
-                        <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
-                          log.severity === 'critical'
-                            ? 'bg-rose-500/20 text-rose-500 border border-rose-500/30'
-                            : log.severity === 'db'
-                              ? 'bg-amber-500/20 text-amber-500'
-                              : 'bg-blue-500/20 text-blue-500'
-                        }`}>
-                          {log.severity.toUpperCase()}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <p className="font-bold text-slate-900 dark:text-white">{log.store_name || 'منشأة عميل'}</p>
-                        <p className="text-[10px] text-slate-400">{log.os_info} • {log.browser_info}</p>
-                      </td>
-                      <td className="py-3 px-4 max-w-xs truncate font-mono text-slate-700 dark:text-slate-300">
-                        {log.message}
-                      </td>
-                      <td className="py-3 px-4 font-mono text-[10px] text-slate-400">
-                        {log.page_url}
-                      </td>
-                      <td className="py-3 px-4 text-slate-400 text-[11px]">
-                        {new Date(log.created_at).toLocaleTimeString('ar-EG')}
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
-                          log.resolved ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
-                        }`}>
-                          {log.resolved ? 'تم الحل' : 'قيد الفحص'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setSelectedError(log)}
-                          className="h-7 px-2 text-[10px] font-bold rounded-lg"
-                        >
-                          <Eye className="w-3 h-3 ml-1" />
-                          التفاصيل
-                        </Button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* ═══════ Tab 4: Performance Benchmark Report ═══════ */}
-      {activeTab === 'benchmark' && (
-        <div className="space-y-4 animate-fadeIn">
-          {benchmarkReport ? (
-            <div className="space-y-4">
-              {/* Summary Card */}
-              <div className="bg-gradient-to-r from-emerald-950/40 via-slate-900 to-slate-900 border border-emerald-500/30 rounded-3xl p-6 shadow-sm">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div className="flex items-center gap-3.5">
-                    <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-                      <Cpu className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-black text-white">
-                        نتيجة اختبار كفاءة الأجهزة الضعيفة (Windows 7 / Core 2 Duo / 2GB RAM)
-                      </h3>
-                      <p className="text-xs text-slate-300 mt-0.5">
-                        تم فحص أداء استعلامات البيانات وسرعة كتابة الفواتير ومعدل استهلاك الذاكرة
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="text-left bg-slate-900/80 px-4 py-2 rounded-2xl border border-slate-800">
-                      <p className="text-[10px] font-bold text-slate-400">مؤشر السرعة الكلي</p>
-                      <p className="text-xl font-black text-emerald-400 font-mono">{benchmarkReport.summary.overall_score} / 100</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-4 border-t border-slate-800/80 text-xs">
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">نظام التشغيل المستهدف:</span>
-                    <strong className="text-white font-mono">Windows 7 (32/64-bit) & XP</strong>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">الحد الأدنى للرام:</span>
-                    <strong className="text-emerald-400 font-mono">2GB RAM متوافق 100%</strong>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">المعالج المستهدف:</span>
-                    <strong className="text-white font-mono">Intel Core 2 Duo / Celeron</strong>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">العمل بدون إنترنت:</span>
-                    <strong className="text-emerald-400 font-mono">مفعل محلياً (Zero Latency)</strong>
-                  </div>
-                </div>
-              </div>
-
-              {/* Benchmarks Metrics Table */}
-              <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
-                <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                  <h3 className="font-black text-sm text-slate-900 dark:text-white">الأرقام القياسية المسجلة بالاختبار المباشر</h3>
-                  <Button
-                    size="sm"
-                    onClick={handleRunBenchmark}
-                    disabled={isRunningBenchmark}
-                    className="h-8 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-500 text-white gap-1"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${isRunningBenchmark ? 'animate-spin' : ''}`} />
-                    إعادة الفحص
-                  </Button>
-                </div>
-
-                <table className="w-full text-right text-xs border-collapse">
-                  <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-black">
-                    <tr>
-                      <th className="py-3 px-4">مؤشر الاختبار (Benchmark Test)</th>
-                      <th className="py-3 px-4 font-mono">الزمن / القيمة الحقيقية</th>
-                      <th className="py-3 px-4 text-center">التقييم</th>
-                      <th className="py-3 px-4">تفاصيل العملية</th>
-                      <th className="py-3 px-4">الجهاز المستهدف</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {benchmarkReport.benchmarks.map((bm, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                        <td className="py-3.5 px-4 font-black text-slate-900 dark:text-white">
-                          {bm.test_name}
-                        </td>
-                        <td className="py-3.5 px-4 font-mono font-black text-blue-600 dark:text-blue-400 text-sm">
-                          {bm.metric_value} {bm.unit}
-                        </td>
-                        <td className="py-3.5 px-4 text-center">
-                          <span className="px-2.5 py-0.5 rounded-full font-bold text-[10px] bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                            فائق السرعة ⚡
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 text-slate-500">
-                          {bm.description}
-                        </td>
-                        <td className="py-3.5 px-4 font-mono text-[10px] text-slate-400">
-                          {bm.hardware_target}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ) : (
-            <div className="p-12 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800">
-              <Button onClick={handleRunBenchmark} className="bg-blue-600 text-white font-bold rounded-xl h-11 px-6">
-                بدء تشغيل اختبار المحاكاة
-              </Button>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* ─── Stack Trace Detail Modal ─── */}
       {selectedError && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-fadeIn">
@@ -749,28 +750,47 @@ export default function SuperAdminPage() {
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
                 <ShieldAlert className="w-5 h-5 text-rose-500" />
-                <h3 className="font-black text-base">تفاصيل الخطأ البرمجي عن بُعد</h3>
+                <h3 className="font-black text-base">تفاصيل تقرير التليمتري والخطأ البرمجي</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedError(null)}
-                className="text-slate-400 hover:text-white p-1"
+                className="text-slate-400 hover:text-white p-1 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-2 text-xs">
-              <p><strong className="text-slate-400">المنشأة:</strong> {selectedError.store_name} ({selectedError.store_id})</p>
-              <p><strong className="text-slate-400">بيئة العميل:</strong> {selectedError.os_info} • {selectedError.browser_info}</p>
-              <p><strong className="text-slate-400">الصفحة:</strong> {selectedError.page_url}</p>
-              <p><strong className="text-slate-400">رسالة الخطأ:</strong> <span className="text-rose-400 font-mono">{selectedError.message}</span></p>
+            <div className="grid grid-cols-2 gap-3 text-xs bg-slate-950 p-4 rounded-2xl border border-slate-800">
+              <div>
+                <span className="text-slate-400 block text-[10px]">المنشأة والمتجر:</span>
+                <strong className="text-white font-bold">{selectedError.store_name}</strong>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[10px]">معرف المنشأة (Store ID):</span>
+                <strong className="text-slate-300 font-mono text-[10px]">{selectedError.store_id}</strong>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[10px]">بيئة ونظام جهاز العميل:</span>
+                <strong className="text-indigo-400 font-bold">{selectedError.os_info} • {selectedError.browser_info}</strong>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[10px]">الصفحة التي حدث بها الخطأ:</span>
+                <strong className="text-blue-400 font-mono">{selectedError.page_url}</strong>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-xs font-bold text-slate-300">رسالة الخطأ:</span>
+              <div className="p-3 bg-rose-950/30 border border-rose-800/40 rounded-xl text-rose-300 font-mono text-xs">
+                {selectedError.message}
+              </div>
             </div>
 
             {selectedError.stack_trace && (
               <div className="space-y-1">
-                <span className="text-[10px] font-bold text-slate-400">Stack Trace:</span>
-                <pre className="p-3 bg-slate-950 rounded-xl font-mono text-[10px] text-slate-300 overflow-x-auto max-h-48 border border-slate-800 leading-relaxed" dir="ltr">
+                <span className="text-[10px] font-bold text-slate-400">تتبع الكود البرمجي (Stack Trace):</span>
+                <pre className="p-3 bg-slate-950 rounded-xl font-mono text-[10px] text-slate-300 overflow-x-auto max-h-44 border border-slate-800 leading-relaxed" dir="ltr">
                   {selectedError.stack_trace}
                 </pre>
               </div>
@@ -780,7 +800,7 @@ export default function SuperAdminPage() {
               <Button
                 variant="outline"
                 onClick={() => setSelectedError(null)}
-                className="h-9 rounded-xl text-xs font-bold border-slate-700"
+                className="h-9 rounded-xl text-xs font-bold border-slate-700 text-slate-300"
               >
                 إغلاق
               </Button>
@@ -788,13 +808,13 @@ export default function SuperAdminPage() {
                 <Button
                   onClick={async () => {
                     await resolveSystemError(selectedError.id)
-                    toast.success('تم تعليم الخطأ كـ محلول')
+                    toast.success('تم تسجيل حل الخطأ وتحديث حالة البلاغ')
                     setSelectedError(null)
                   }}
-                  className="h-9 px-4 rounded-xl text-xs font-black bg-emerald-600 hover:bg-emerald-500 text-white gap-1"
+                  className="h-9 px-4 rounded-xl text-xs font-black bg-emerald-600 hover:bg-emerald-500 text-white gap-1.5 shadow-md shadow-emerald-600/30 cursor-pointer"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  تم حل الخطأ في التحديث
+                  تم معالجة المشكلة في التحديث
                 </Button>
               )}
             </div>
