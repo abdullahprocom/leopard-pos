@@ -517,3 +517,73 @@ export interface CartState {
   paid_amount: number
   due_amount: number
 }
+
+// ============================================================
+// SaaS Architecture, Licensing, Telemetry & Super Admin
+// ============================================================
+
+export type LicenseDuration = 'trial_14d' | '1_month' | '3_months' | '6_months' | '1_year' | 'lifetime'
+export type LicenseStatus = 'active' | 'expired' | 'suspended' | 'unused'
+export type ErrorSeverity = 'critical' | 'error' | 'warning' | 'network' | 'db'
+
+export interface LicenseToken {
+  id: string
+  token: string
+  business_type: BusinessType
+  duration: LicenseDuration
+  status: LicenseStatus
+  client_name?: string
+  client_phone?: string
+  created_at: string
+  activated_at?: string
+  expires_at: string
+  max_devices: number
+  notes?: string
+}
+
+export interface TenantStoreRecord {
+  id: string
+  store_name: string
+  owner_name: string
+  owner_phone?: string
+  business_type: BusinessType
+  status: 'active' | 'suspended' | 'expired'
+  token: string
+  created_at: string
+  expires_at: string
+  last_active_at?: string
+  total_items?: number
+  total_sales_count?: number
+  total_revenue?: number
+}
+
+export interface SystemErrorLog {
+  id: string
+  store_id: string
+  store_name?: string
+  user_id?: string
+  user_role?: string
+  severity: ErrorSeverity
+  message: string
+  stack_trace?: string
+  component_stack?: string
+  page_url: string
+  user_agent?: string
+  browser_info?: string
+  os_info?: string
+  is_online: boolean
+  resolved: boolean
+  resolved_at?: string
+  resolved_by?: string
+  created_at: string
+}
+
+export interface PerformanceBenchmark {
+  test_name: string
+  category: 'database' | 'transaction' | 'transfer' | 'memory' | 'rendering'
+  metric_value: number
+  unit: 'ms' | 'KB' | 'MB' | 'ops/sec' | '%'
+  rating: 'ultra_fast' | 'good' | 'average' | 'poor'
+  description: string
+  hardware_target: string
+}

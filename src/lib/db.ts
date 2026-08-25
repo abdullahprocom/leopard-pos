@@ -7,7 +7,8 @@ import type {
   StockBalance, StockLedgerEntry, Supplier, Purchase, PurchaseLine,
   PurchaseReturn, PurchaseReturnLine, Customer, Sale, SaleLine, SalesReturn, SalesReturnLine,
   CashTransaction, CashierShift, Employee, Role, RolePermission,
-  SyncOperation, Stocktaking, StockTransfer
+  SyncOperation, Stocktaking, StockTransfer,
+  SystemErrorLog, LicenseToken, TenantStoreRecord
 } from '@/lib/types'
 
 // Extended types for stocktaking and transfers (local only)
@@ -119,10 +120,15 @@ class LeopardDatabase extends Dexie {
   sync_queue!: EntityTable<SyncQueueEntry, 'id'>
   local_cart!: EntityTable<LocalCart, 'device_id'>
 
+  // SaaS Super Admin, Licensing & Telemetry Logs
+  system_error_logs!: EntityTable<SystemErrorLog, 'id'>
+  license_tokens!: EntityTable<LicenseToken, 'id'>
+  tenant_stores!: EntityTable<TenantStoreRecord, 'id'>
+
   constructor() {
     super('LeopardPOS')
 
-    this.version(5).stores({
+    this.version(6).stores({
       // Foundation
       stores: 'id, owner_id, created_at',
       branches: 'id, store_id, code, is_default, created_at',
@@ -168,6 +174,11 @@ class LeopardDatabase extends Dexie {
 
       // Local cart per device
       local_cart: 'device_id',
+
+      // SaaS Super Admin, Licensing & Telemetry
+      system_error_logs: 'id, store_id, severity, resolved, created_at',
+      license_tokens: 'id, token, business_type, status, expires_at, created_at',
+      tenant_stores: 'id, store_name, business_type, status, token, expires_at, created_at',
     })
   }
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { 
   ShieldCheck, 
@@ -194,11 +195,20 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          {/* Enterprise Security Note */}
-          <div className="pt-4 border-t border-slate-800">
+          {/* Enterprise Security Note & Activation Link */}
+          <div className="pt-4 border-t border-slate-800 space-y-2.5">
             <div className="flex items-center justify-center gap-2 text-xs sm:text-sm font-black text-slate-400 bg-slate-900/80 border border-slate-800 py-3 px-4 rounded-2xl">
               <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
               <span>منظومة إدارية مغلقة ومحمية — يتم منح الصلاحيات عبر الإدارة</span>
+            </div>
+
+            <div className="text-center">
+              <Link
+                href="/activate"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-400 hover:text-indigo-300 transition-colors"
+              >
+                <span>🔑 لديك كود تفعيل وترخيص جديد؟ اضغط هنا لتفعيل متجرك</span>
+              </Link>
             </div>
           </div>
 

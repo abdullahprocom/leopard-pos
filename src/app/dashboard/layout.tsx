@@ -33,6 +33,7 @@ import {
   Tag,
   FileSpreadsheet,
   DollarSign,
+  Server,
 } from 'lucide-react'
 import { OnlineStatus } from '@/components/OnlineStatus'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -40,6 +41,8 @@ import { useStore } from '@/lib/store-context'
 import { useAuth, canAccessRoute } from '@/lib/auth-context'
 import { CalculatorModal } from '@/components/calculator-modal'
 import { Button } from '@/components/ui/button'
+import { initGlobalErrorListeners } from '@/lib/logger'
+import { GlobalErrorBoundary } from '@/components/GlobalErrorBoundary'
 
 // Complete navigation links with modern Lucide icons
 const navLinks = [
@@ -59,6 +62,7 @@ const navLinks = [
   { label: 'الموردين', href: '/dashboard/suppliers', icon: Building2, roles: ['admin', 'supervisor'] },
   { label: 'التقارير والأرباح', href: '/dashboard/reports', icon: BarChart3, roles: ['admin', 'supervisor'] },
   { label: 'الموظفين والصلاحيات', href: '/dashboard/employees', icon: UserCog, roles: ['admin'] },
+  { label: 'الإدارة المركزية والتراخيص', href: '/dashboard/super-admin', icon: Server, roles: ['admin'] },
   { label: 'إعدادات النظام', href: '/dashboard/settings', icon: Settings, roles: ['admin'] },
 ]
 
@@ -77,6 +81,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       router.replace('/login')
     }
   }, [isLoading, currentUser, router])
+
+  // Initialize Telemetry and Error Listener for silent bug reporting
+  useEffect(() => {
+    initGlobalErrorListeners()
+  }, [])
 
   // Auto-close mobile drawer on route change
   useEffect(() => {
@@ -328,27 +337,29 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         {/* Scrollable Content Container (Comfortable 96-98% Fluid Workspace with 10px breathing margins) */}
         <main className="flex-1 overflow-y-auto w-full h-full relative bg-slate-50 dark:bg-slate-950 transition-colors p-2.5 sm:p-3.5">
           <div className="w-full h-full">
-            {hasAccess ? (
-              children
-            ) : (
-              <div className="bg-rose-500/10 border-2 border-rose-500/30 rounded-3xl p-8 text-center space-y-4 max-w-xl mx-auto my-12">
-                <div className="w-16 h-16 rounded-3xl bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto border border-rose-500/30">
-                  <Lock className="w-8 h-8" />
+            <GlobalErrorBoundary>
+              {hasAccess ? (
+                children
+              ) : (
+                <div className="bg-rose-500/10 border-2 border-rose-500/30 rounded-3xl p-8 text-center space-y-4 max-w-xl mx-auto my-12">
+                  <div className="w-16 h-16 rounded-3xl bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto border border-rose-500/30">
+                    <Lock className="w-8 h-8" />
+                  </div>
+                  <h3 className="text-xl font-black text-rose-500">
+                    غير مصرح لك بالوصول إلى هذه الصفحة
+                  </h3>
+                  <p className="text-sm font-semibold text-slate-400 leading-relaxed">
+                    حسابك الحالي مسجل بصفة ({roleLabel})، وهذه الشاشة مخصصة لإدارة النظام فقط.
+                  </p>
+                  <Button
+                    onClick={() => router.push(isCashier ? '/dashboard/pos' : '/dashboard')}
+                    className="bg-blue-600 hover:bg-blue-500 text-white font-black rounded-xl h-11 px-6 shadow-lg shadow-blue-600/30 cursor-pointer"
+                  >
+                    العودة للشاشة المسموحة
+                  </Button>
                 </div>
-                <h3 className="text-xl font-black text-rose-500">
-                  غير مصرح لك بالوصول إلى هذه الصفحة
-                </h3>
-                <p className="text-sm font-semibold text-slate-400 leading-relaxed">
-                  حسابك الحالي مسجل بصفة ({roleLabel})، وهذه الشاشة مخصصة لإدارة النظام فقط.
-                </p>
-                <Button
-                  onClick={() => router.push(isCashier ? '/dashboard/pos' : '/dashboard')}
-                  className="bg-blue-600 hover:bg-blue-500 text-white font-black rounded-xl h-11 px-6 shadow-lg shadow-blue-600/30 cursor-pointer"
-                >
-                  العودة للشاشة المسموحة
-                </Button>
-              </div>
-            )}
+              )}
+            </GlobalErrorBoundary>
           </div>
         </main>
         
