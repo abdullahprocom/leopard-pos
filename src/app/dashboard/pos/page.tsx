@@ -280,7 +280,7 @@ export default function POSPage() {
     }
   }
 
-  // Add Item to Cart with full unit conversion & stock awareness
+  // Add Item to Cart with strict stock enforcement & full unit conversion
   const addToCart = (
     item: any, 
     quantity: number = 1, 
@@ -288,6 +288,35 @@ export default function POSPage() {
     overridePrice?: number,
     conversionFactor: number = 1
   ) => {
+    const availableStock = stockMap.get(item.id) ?? 0
+    const baseUnitName = item.unit || (item.allow_decimal ? 'كيلو جرام' : 'قطعة')
+    const unitName = unitLabel || baseUnitName
+
+    // ⛔ Strict Stock Check 1: Zero Stock Prevention
+    if (item.manage_inventory !== false && availableStock <= 0) {
+      toast.error(`🚫 عذراً، لا يمكن إضافة (${item.name}): رصيد المخزن صفر (نفد تماماً)`)
+      return
+    }
+
+    const allowDec = Boolean(item.allow_decimal)
+    let validQty = cleanPositiveQuantity(quantity, allowDec)
+    const requiredBaseUnits = validQty * conversionFactor
+
+    // ⛔ Strict Stock Check 2: Exceeding Available Stock Prevention
+    if (item.manage_inventory !== false && requiredBaseUnits > availableStock) {
+      const maxAllowable = allowDec 
+        ? Math.max(0, Math.floor((availableStock / conversionFactor) * 1000) / 1000)
+        : Math.floor(availableStock / conversionFactor)
+      
+      if (maxAllowable <= 0) {
+        toast.error(`🚫 لا يوجد رصيد كافٍ في المخزن لبيع وحدة (${unitName}). المتاح فقط: ${availableStock} ${baseUnitName}`)
+        return
+      }
+
+      toast.warning(`⚠️ تم تقليص الكمية إلى الحد الأقصى المتوفر بالمخزن وهو (${maxAllowable} ${unitName})`)
+      validQty = maxAllowable
+    }
+
     const basePrice = cleanPositivePrice(
       priceCategory === 'wholesale' && item.wholesale_price 
         ? item.wholesale_price 
@@ -298,11 +327,6 @@ export default function POSPage() {
       ? overridePrice 
       : money(basePrice * conversionFactor)
 
-    const allowDec = Boolean(item.allow_decimal)
-    const validQty = cleanPositiveQuantity(quantity, allowDec)
-    const availableStock = stockMap.get(item.id) ?? 0
-    const baseUnitName = item.unit || (allowDec ? 'كيلو جرام' : 'قطعة')
-    const unitName = unitLabel || baseUnitName
     const unitOptions = getItemUnitOptions(item)
 
     setCart(prev => {
@@ -313,12 +337,15 @@ export default function POSPage() {
           : cleanPositiveQuantity(existing.quantity + validQty, false)
         
         const totalBaseQty = nextQty * existing.conversion_factor
-        const exceeds = item.manage_inventory !== false && totalBaseQty > availableStock
-        const nextTotal = money(nextQty * existing.unit_price - existing.discount)
-
-        if (exceeds) {
-          toast.warning(`تنبيه: الكمية المطلوبة (${nextQty} ${unitName}) تتجاوز المخزون المتاح (${availableStock} ${baseUnitName})`)
+        if (item.manage_inventory !== false && totalBaseQty > availableStock) {
+          const maxAllowed = allowDec 
+            ? Math.floor((availableStock / existing.conversion_factor) * 1000) / 1000
+            : Math.floor(availableStock / existing.conversion_factor)
+          toast.error(`🚫 تم الوصول لأقصى كمية متوفرة في المخزن (${maxAllowed} ${unitName})`)
+          return prev
         }
+
+        const nextTotal = money(nextQty * existing.unit_price - existing.discount)
 
         return prev.map(i => (i.item_id === item.id && i.unit_name === unitName)
           ? { 
@@ -326,17 +353,10 @@ export default function POSPage() {
               quantity: nextQty, 
               total: Math.max(0, nextTotal),
               available_stock: availableStock,
-              exceeds_stock: exceeds
+              exceeds_stock: false
             } 
           : i
         )
-      }
-
-      const totalBaseQty = validQty * conversionFactor
-      const exceeds = item.manage_inventory !== false && totalBaseQty > availableStock
-
-      if (exceeds) {
-        toast.warning(`تنبيه: الكمية المطلوبة (${validQty} ${unitName}) تتجاوز المخزون المتاح (${availableStock} ${baseUnitName})`)
       }
 
       return [...prev, {
@@ -355,7 +375,7 @@ export default function POSPage() {
         unit_name: unitName,
         conversion_factor: conversionFactor,
         available_units: unitOptions,
-        exceeds_stock: exceeds
+        exceeds_stock: false
       }]
     })
 
@@ -366,12 +386,16 @@ export default function POSPage() {
   const handleUnitChange = (cartItemId: string, newUnit: UnitOption) => {
     setCart(prev => prev.map(item => {
       if (item.id === cartItemId) {
+        const requiredBaseQty = item.quantity * newUnit.conversion_factor
+        if (requiredBaseQty > item.available_stock) {
+          toast.error(`🚫 لا يوجد رصيد كافٍ بالمخزن لوحدة (${newUnit.unit_name}). المتاح: ${item.available_stock} ${item.base_unit}`)
+          return item
+        }
+
         const newUnitPrice = newUnit.price !== undefined && newUnit.price > 0
           ? newUnit.price
           : money(item.base_price * newUnit.conversion_factor)
         
-        const totalBaseQty = item.quantity * newUnit.conversion_factor
-        const exceeds = totalBaseQty > item.available_stock
         const newTotal = money(item.quantity * newUnitPrice - item.discount)
 
         return {
@@ -381,7 +405,7 @@ export default function POSPage() {
           unit_price: newUnitPrice,
           conversion_factor: newUnit.conversion_factor,
           total: Math.max(0, newTotal),
-          exceeds_stock: exceeds
+          exceeds_stock: false
         }
       }
       return item
@@ -391,14 +415,20 @@ export default function POSPage() {
 
   const handleScaleConfirm = (calculatedKg: number) => {
     if (!scaleItem) return
-    const validKg = cleanPositiveQuantity(calculatedKg, true)
-    const basePrice = cleanPositivePrice(scaleItem.sell_price || scaleItem.unit_price || 0)
     const availableStock = stockMap.get(scaleItem.id) ?? 0
-    const exceeds = scaleItem.manage_inventory !== false && validKg > availableStock
 
-    if (exceeds) {
-      toast.warning(`تنبيه: الوزن المطلوب (${validKg} كجم) يتجاوز المخزون المتاح (${availableStock} كجم)`)
+    if (scaleItem.manage_inventory !== false && availableStock <= 0) {
+      toast.error(`🚫 لا يمكن بيع (${scaleItem.name}): رصيد المخزن صفر`)
+      return
     }
+
+    let validKg = cleanPositiveQuantity(calculatedKg, true)
+    if (scaleItem.manage_inventory !== false && validKg > availableStock) {
+      toast.error(`🚫 الوزن المطلوب (${validKg} كجم) يتجاوز الرصيد المتوفر بالمخزن (${availableStock} كجم)`)
+      validKg = availableStock
+    }
+
+    const basePrice = cleanPositivePrice(scaleItem.sell_price || scaleItem.unit_price || 0)
 
     setCart(prev => {
       const existing = prev.find(i => i.item_id === scaleItem.id)
@@ -410,7 +440,7 @@ export default function POSPage() {
               quantity: validKg, 
               total: Math.max(0, nextTotal),
               available_stock: availableStock,
-              exceeds_stock: exceeds
+              exceeds_stock: false
             }
           : i
         )
@@ -433,7 +463,7 @@ export default function POSPage() {
         unit_name: 'كيلو جرام',
         conversion_factor: 1,
         available_units: unitOptions,
-        exceeds_stock: exceeds
+        exceeds_stock: false
       }]
     })
 
@@ -447,17 +477,16 @@ export default function POSPage() {
         if (newQty <= 0) return null
 
         const totalBaseQty = newQty * (item.conversion_factor || 1)
-        const exceeds = totalBaseQty > item.available_stock
-
-        if (exceeds && delta > 0) {
-          toast.warning(`تنبيه: الكمية (${newQty}) تتجاوز المخزون المتاح (${item.available_stock} ${item.base_unit})`)
+        if (delta > 0 && totalBaseQty > item.available_stock) {
+          toast.error(`🚫 لا يمكن زيادة الكمية: الحد الأقصى المتوفر بالمخزن هو (${item.available_stock} ${item.base_unit})`)
+          return item
         }
 
         return {
           ...item,
           quantity: newQty,
           total: money(newQty * item.unit_price - item.discount),
-          exceeds_stock: exceeds
+          exceeds_stock: false
         }
       }
       return item
@@ -469,15 +498,22 @@ export default function POSPage() {
     if (isNaN(val) || val <= 0) return
     setCart(prev => prev.map(item => {
       if (item.id === id) {
-        const newQty = cleanPositiveQuantity(val, item.allow_decimal)
+        let newQty = cleanPositiveQuantity(val, item.allow_decimal)
         const totalBaseQty = newQty * (item.conversion_factor || 1)
-        const exceeds = totalBaseQty > item.available_stock
+        
+        if (totalBaseQty > item.available_stock) {
+          const maxAllowed = item.allow_decimal 
+            ? Math.floor((item.available_stock / item.conversion_factor) * 1000) / 1000
+            : Math.floor(item.available_stock / item.conversion_factor)
+          toast.error(`🚫 الكمية المطلوبة تتجاوز المخزون: تم الضبط على المتاح (${maxAllowed} ${item.unit_name})`)
+          newQty = maxAllowed
+        }
 
         return {
           ...item,
           quantity: newQty,
           total: money(newQty * item.unit_price - item.discount),
-          exceeds_stock: exceeds
+          exceeds_stock: false
         }
       }
       return item
@@ -558,6 +594,19 @@ export default function POSPage() {
     if (cart.length === 0) {
       toast.error('السلة فارغة! يرجى إضافة أصناف أولاً')
       return
+    }
+
+    // ⛔ Strict Checkout Validation: Ensure NO item in cart exceeds current stock
+    for (const line of cart) {
+      const dbItem = allItems.find(i => i.id === line.item_id)
+      if (dbItem && dbItem.manage_inventory !== false) {
+        const requiredBase = line.quantity * (line.conversion_factor || 1)
+        const currentAvail = stockMap.get(line.item_id) ?? 0
+        if (requiredBase > currentAvail) {
+          toast.error(`🚫 لا يمكن إتمام البيع: رصيد المخزن من (${line.name}) غير كافٍ. المطلوب: ${line.quantity} (${requiredBase} ${line.base_unit})، المتوفر: ${currentAvail} ${line.base_unit}`)
+          return
+        }
+      }
     }
 
     try {

@@ -3,12 +3,12 @@
 import React, { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from '@/lib/db'
+import { db, deleteStoreSalesInvoices } from '@/lib/db'
 import { 
   Plus, Search, ShoppingCart, Receipt, Calendar, CreditCard, 
   Banknote, Eye, Printer, X, FileSpreadsheet,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
-  LayoutGrid, LayoutList, TrendingUp
+  LayoutGrid, LayoutList, TrendingUp, Trash2, AlertTriangle
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -55,6 +55,35 @@ export default function SalesListPage() {
   const [paymentFilter, setPaymentFilter] = useState<string>('all')
   const [selectedSale, setSelectedSale] = useState<any>(null)
   const [isThermalModalOpen, setIsThermalModalOpen] = useState(false)
+  const [isClearAllModalOpen, setIsClearAllModalOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const handleClearAllSales = async () => {
+    try {
+      setIsDeleting(true)
+      await deleteStoreSalesInvoices(currentStoreId)
+      toast.success('تم حذف وتصفير سجل فواتير المبيعات بالكامل بنجاح')
+      setIsClearAllModalOpen(false)
+    } catch (err: any) {
+      console.error(err)
+      toast.error('حدث خطأ أثناء حذف الفواتير: ' + err.message)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const handleDeleteSingleSale = async (saleId: string, invoiceNumber: string) => {
+    if (!confirm(`هل أنت متأكد من حذف الفاتورة رقم ${invoiceNumber}؟`)) return
+    try {
+      await db.sales.delete(saleId)
+      await db.sale_lines.where('sale_id').equals(saleId).delete()
+      await db.cash_transactions.where('reference_id').equals(saleId).delete()
+      toast.success(`تم حذف الفاتورة ${invoiceNumber} بنجاح`)
+    } catch (err: any) {
+      console.error(err)
+      toast.error('حدث خطأ أثناء حذف الفاتورة: ' + err.message)
+    }
+  }
 
   // ─── Table State ───
   const [currentPage, setCurrentPage] = useState(1)
@@ -172,12 +201,26 @@ export default function SalesListPage() {
             </p>
           </div>
         </div>
-        <Link href="/dashboard/pos">
-          <Button className="h-11 px-5 text-xs font-black bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-md shadow-blue-600/25 active:scale-95 transition-all">
-            <ShoppingCart className="w-4 h-4 ml-1.5" />
-            فتح نقطة البيع (الكاشير)
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2 flex-wrap">
+          {salesData.length > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsClearAllModalOpen(true)}
+              className="h-11 px-4 text-xs font-bold border-rose-300 dark:border-rose-800 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl cursor-pointer"
+            >
+              <Trash2 className="w-4 h-4 ml-1.5" />
+              تصفير الفواتير ({salesData.length})
+            </Button>
+          )}
+
+          <Link href="/dashboard/pos">
+            <Button className="h-11 px-5 text-xs font-black bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-md shadow-blue-600/25 active:scale-95 transition-all">
+              <ShoppingCart className="w-4 h-4 ml-1.5" />
+              فتح نقطة البيع (الكاشير)
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* ── Row 2: KPI Stats Cards ── */}
@@ -435,6 +478,14 @@ export default function SalesListPage() {
                         >
                           <Eye className="w-3.5 h-3.5" />
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSingleSale(sale.id, sale.invoice_number)}
+                          className="w-7 h-7 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 flex items-center justify-center transition-all cursor-pointer active:scale-95"
+                          title="حذف الفاتورة"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -618,6 +669,53 @@ export default function SalesListPage() {
               >
                 <Printer className="w-3.5 h-3.5" />
                 طباعة الآن
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Confirmation Modal: Clear All Sales ─── */}
+      {isClearAllModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border-2 border-rose-500 rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4 text-right" dir="rtl">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <h3 className="text-base font-black text-rose-600 dark:text-rose-400 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400" />
+                تأكيد تصفير وحذف جميع الفواتير
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsClearAllModalOpen(false)}
+                className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 space-y-2 text-xs font-bold text-rose-950 dark:text-rose-200 leading-relaxed">
+              <p className="text-sm font-black text-rose-600 dark:text-rose-400">⚠️ تحذير مسح فواتير المبيعات:</p>
+              <p>هل أنت متأكد من حذف كافة فواتير المبيعات المسجلة البالغ عددها ({salesData.length}) فاتورة وتصفير الإحصائيات بالكامل؟</p>
+              <p className="text-slate-600 dark:text-slate-400 font-normal">ملاحظة: هذا الإجراء سيقوم بمسح فواتير المبيعات وسجل التحصيل النقدي المرتبط بها.</p>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isDeleting}
+                onClick={() => setIsClearAllModalOpen(false)}
+                className="flex-1 h-11 rounded-xl text-xs font-bold border-slate-300 dark:border-slate-700"
+              >
+                إلغاء
+              </Button>
+              <Button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleClearAllSales}
+                className="flex-1 h-11 rounded-xl text-xs font-black bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-600/30"
+              >
+                {isDeleting ? 'جاري المسح...' : 'نعم، امسح كافة الفواتير'}
               </Button>
             </div>
           </div>

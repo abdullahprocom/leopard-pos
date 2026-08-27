@@ -287,4 +287,70 @@ export async function ensureDefaultCategories(
   }
 }
 
+// 💥 Factory Reset / Wipe Entire Store Data
+export async function resetStoreEntireData(
+  storeId: string, 
+  businessType: BusinessType = 'supermarket'
+): Promise<void> {
+  // 1. Delete all records associated with this storeId across all operational tables
+  await Promise.all([
+    db.items.where('store_id').equals(storeId).delete(),
+    db.categories.where('store_id').equals(storeId).delete(),
+    db.item_barcodes.where('store_id').equals(storeId).delete(),
+    db.item_units.where('store_id').equals(storeId).delete(),
+    db.item_price_history.where('store_id').equals(storeId).delete(),
+    db.stock_balances.where('store_id').equals(storeId).delete(),
+    db.stock_ledger.where('store_id').equals(storeId).delete(),
+    db.sales.where('store_id').equals(storeId).delete(),
+    db.sale_lines.where('store_id').equals(storeId).delete(),
+    db.sales_returns.where('store_id').equals(storeId).delete(),
+    db.sales_return_lines.where('store_id').equals(storeId).delete(),
+    db.purchases.where('store_id').equals(storeId).delete(),
+    db.purchase_lines.where('store_id').equals(storeId).delete(),
+    db.purchase_returns.where('store_id').equals(storeId).delete(),
+    db.purchase_return_lines.where('store_id').equals(storeId).delete(),
+    db.cash_transactions.where('store_id').equals(storeId).delete(),
+    db.cashier_shifts.where('store_id').equals(storeId).delete(),
+    db.customers.where('store_id').equals(storeId).delete(),
+    db.suppliers.where('store_id').equals(storeId).delete(),
+    db.employees.where('store_id').equals(storeId).delete(),
+    db.stocktaking.where('store_id').equals(storeId).delete(),
+    db.stocktaking_lines.where('store_id').equals(storeId).delete(),
+    db.stock_transfers.where('store_id').equals(storeId).delete(),
+    db.stock_transfer_lines.where('store_id').equals(storeId).delete(),
+    db.system_error_logs.where('store_id').equals(storeId).delete(),
+  ])
+
+  // 2. Clear sync queue & local carts
+  await (db as any).sync_queue.clear()
+  await (db as any).local_carts.clear()
+
+  // 3. Reseed initial default clean categories for this business type
+  await ensureDefaultCategories(storeId, businessType, true)
+
+  // 4. Seed initial default admin employee so the system is ready to use
+  const now = new Date().toISOString()
+  await db.employees.add({
+    id: crypto.randomUUID(),
+    store_id: storeId,
+    name: 'المدير العام',
+    phone: '01000000000',
+    status: 'active',
+    created_at: now,
+    updated_at: now
+  })
+}
+
+// 🗑️ Delete all Sales Invoices and related cash inflow for a store
+export async function deleteStoreSalesInvoices(storeId: string): Promise<void> {
+  await Promise.all([
+    db.sales.where('store_id').equals(storeId).delete(),
+    db.sale_lines.where('store_id').equals(storeId).delete(),
+    db.sales_returns.where('store_id').equals(storeId).delete(),
+    db.sales_return_lines.where('store_id').equals(storeId).delete(),
+    db.cash_transactions.where('store_id').equals(storeId).filter(tx => tx.type === 'sale' || tx.type === 'sale_return').delete(),
+    (db as any).local_carts.clear()
+  ])
+}
+
 export type { SyncQueueEntry, LocalCart, StocktakingLocal, StocktakingLineLocal, StockTransferLocal, StockTransferLineLocal }

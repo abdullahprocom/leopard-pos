@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { db } from '@/lib/db'
+import { db, resetStoreEntireData, deleteStoreSalesInvoices } from '@/lib/db'
 import { syncEngine, DEFAULT_STORE_UUID, DEFAULT_USER_UUID, getTenantInfo } from '@/lib/sync-engine'
 import { useStore } from '@/lib/store-context'
 import { useAuth } from '@/lib/auth-context'
 import { BusinessType } from '@/lib/types'
 import { toast } from 'sonner'
-import { Save, Store, Printer, RefreshCw, Database, ShieldCheck, Key, Layers, CheckCircle2, Trash2, Lock } from 'lucide-react'
+import { Save, Store, Printer, RefreshCw, Database, ShieldCheck, Key, Layers, CheckCircle2, Trash2, Lock, AlertTriangle, ShieldAlert, RotateCcw, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -40,6 +40,46 @@ export default function SettingsPage() {
   const [inputToken, setInputToken] = useState(activationToken || '')
   const [isSaving, setIsSaving] = useState(false)
   const [syncStatus, setSyncStatus] = useState({ pending: 0, synced: 0, failed: 0 })
+
+  const [isResetAllModalOpen, setIsResetAllModalOpen] = useState(false)
+  const [isResetSalesModalOpen, setIsResetSalesModalOpen] = useState(false)
+  const [isExecutingReset, setIsExecutingReset] = useState(false)
+
+  const handleExecuteResetAll = async () => {
+    try {
+      setIsExecutingReset(true)
+      const tenant = getTenantInfo(localBusinessType)
+      await resetStoreEntireData(tenant.storeId, localBusinessType)
+      toast.success('تم حذف وتصفير جميع بيانات المنظومة بالكامل بنجاح كأنها جديدة!')
+      setIsResetAllModalOpen(false)
+      setTimeout(() => {
+        window.location.reload()
+      }, 800)
+    } catch (err: any) {
+      console.error(err)
+      toast.error('حدث خطأ أثناء تصفير البيانات: ' + err.message)
+    } finally {
+      setIsExecutingReset(false)
+    }
+  }
+
+  const handleExecuteResetSales = async () => {
+    try {
+      setIsExecutingReset(true)
+      const tenant = getTenantInfo(localBusinessType)
+      await deleteStoreSalesInvoices(tenant.storeId)
+      toast.success('تم مسح وتصفير جميع فواتير المبيعات بنجاح!')
+      setIsResetSalesModalOpen(false)
+      setTimeout(() => {
+        window.location.reload()
+      }, 800)
+    } catch (err: any) {
+      console.error(err)
+      toast.error('حدث خطأ أثناء مسح الفواتير: ' + err.message)
+    } finally {
+      setIsExecutingReset(false)
+    }
+  }
 
   useEffect(() => {
     async function loadSettings() {
@@ -416,7 +456,163 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+        {/* 6. Danger Zone & Factory Reset Card */}
+        <Card className="lg:col-span-2 border-rose-200 dark:border-rose-900/50 bg-rose-50/20 dark:bg-rose-950/10 shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
+              <ShieldAlert className="h-5 w-5 text-rose-600 dark:text-rose-400" />
+              منطقة العمليات الحساسة وتصفير البيانات (Danger Zone)
+            </CardTitle>
+            <CardDescription className="text-slate-600 dark:text-slate-400">
+              تصفير الفواتير أو حذف كافة بيانات المنظومة بالكامل وإعادتها لحالة المصنع كأنها جديدة
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-900/60 flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <p className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
+                  <Trash2 className="w-4 h-4 text-amber-500" />
+                  حذف وتصفير سجل فواتير المبيعات فقط
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  مسح كافة فواتير المبيعات وحركات النقدية المرتبطة بها وتصفير الإحصائيات مع الإبقاء على الأصناف والمخزون
+                </p>
+              </div>
+
+              <Button
+                type="button"
+                onClick={() => setIsResetSalesModalOpen(true)}
+                className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs h-11 px-5 rounded-xl cursor-pointer shadow-md shadow-amber-600/20"
+              >
+                تصفير الفواتير
+              </Button>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-rose-300 dark:border-rose-800 flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <p className="text-sm font-black text-rose-600 dark:text-rose-400 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+                  إعادة ضبط المصنع وحذف جميع بيانات النشاط بالكامل (Factory Reset)
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  حذف شامل لجميع الأصناف، المخزون، الموظفين، المشتريات، المبيعات، والعملاء وإرجاع النظام طازجاً كأنه لم يُستخدم
+                </p>
+              </div>
+
+              <Button
+                type="button"
+                onClick={() => setIsResetAllModalOpen(true)}
+                className="bg-rose-600 hover:bg-rose-700 text-white font-black text-xs h-11 px-5 rounded-xl cursor-pointer shadow-lg shadow-rose-600/30"
+              >
+                تصفير شامل للبيانات (Factory Reset)
+              </Button>
+            </div>
+
+          </CardContent>
+        </Card>
+
       </div>
+
+      {/* ─── Confirmation Modal: Reset Entire Store (Factory Reset) ─── */}
+      {isResetAllModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border-2 border-rose-500 rounded-3xl p-6 w-full max-w-lg shadow-2xl space-y-5 text-right" dir="rtl">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <h3 className="text-lg font-black text-rose-600 dark:text-rose-400 flex items-center gap-2">
+                <AlertTriangle className="w-6 h-6 text-rose-600 dark:text-rose-400 animate-bounce" />
+                تأكيد حذف وتصفير جميع بيانات النشاط التجاري
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsResetAllModalOpen(false)}
+                className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 space-y-2 text-xs font-bold text-rose-950 dark:text-rose-200 leading-relaxed">
+              <p className="text-sm font-black text-rose-600 dark:text-rose-400">⚠️ تحذير نهائي لا يمكن التراجع عنه:</p>
+              <p>هل أنت متأكد تماماً أنك تريد حذف وتصفير جميع بيانات النشاط التجاري بالكامل؟</p>
+              <ul className="list-disc list-inside space-y-1 text-slate-700 dark:text-slate-300 font-semibold">
+                <li>سيتم مسح كافة الأصناف والباركودات ووحدات القياس.</li>
+                <li>سيتم تصفير المخزون بالكامل وحركات كشف الحساب.</li>
+                <li>سيتم حذف كافة فواتير المبيعات والمشتريات والمصروفات.</li>
+                <li>سيتم حذف حسابات العملاء والموردين والموظفين.</li>
+                <li>سيعود النظام إلى الحالة الأصلية الطازجة كأنه برنامج جديد لم يُستخدم قط.</li>
+              </ul>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isExecutingReset}
+                onClick={() => setIsResetAllModalOpen(false)}
+                className="flex-1 h-12 rounded-xl text-sm font-bold border-slate-300 dark:border-slate-700"
+              >
+                إلغاء وتراجع
+              </Button>
+              <Button
+                type="button"
+                disabled={isExecutingReset}
+                onClick={handleExecuteResetAll}
+                className="flex-1 h-12 rounded-xl text-sm font-black bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-600/30"
+              >
+                {isExecutingReset ? 'جاري التصفير والحذف...' : 'نعم، متأكد واحذف كل شيء'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Confirmation Modal: Reset Sales Invoices Only ─── */}
+      {isResetSalesModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border-2 border-amber-500 rounded-3xl p-6 w-full max-w-lg shadow-2xl space-y-5 text-right" dir="rtl">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <h3 className="text-lg font-black text-amber-600 dark:text-amber-400 flex items-center gap-2">
+                <Trash2 className="w-6 h-6 text-amber-500" />
+                تأكيد حذف وتصفير سجل فواتير المبيعات
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsResetSalesModalOpen(false)}
+                className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 space-y-2 text-xs font-bold text-amber-950 dark:text-amber-200 leading-relaxed">
+              <p className="text-sm font-black text-amber-600 dark:text-amber-400">⚠️ تأكيد مسح الفواتير:</p>
+              <p>سيتم حذف كافة فواتير المبيعات المسجلة وتصفير إحصائيات المبيعات، مع الحفاظ على الأصناف والمخزون الحالي دون تغيير.</p>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isExecutingReset}
+                onClick={() => setIsResetSalesModalOpen(false)}
+                className="flex-1 h-12 rounded-xl text-sm font-bold border-slate-300 dark:border-slate-700"
+              >
+                إلغاء وتراجع
+              </Button>
+              <Button
+                type="button"
+                disabled={isExecutingReset}
+                onClick={handleExecuteResetSales}
+                className="flex-1 h-12 rounded-xl text-sm font-black bg-amber-600 hover:bg-amber-700 text-white shadow-lg shadow-amber-600/30"
+              >
+                {isExecutingReset ? 'جاري المسح...' : 'نعم، امسح الفواتير'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
