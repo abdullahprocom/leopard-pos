@@ -78,6 +78,8 @@ export interface Item {
   manage_inventory: boolean
   not_for_sale: boolean
   low_stock_alert: number
+  min_limit?: number
+  min_stock?: number
   allow_decimal?: boolean // للوزن والكسور المنضبطة
   image_url?: string
   search_text: string

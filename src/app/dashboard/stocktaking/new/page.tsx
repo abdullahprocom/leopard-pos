@@ -98,20 +98,28 @@ export default function NewStocktakingPage() {
 
           if (diff !== 0) {
             // Update stock balance
-            const balance = await db.stock_balances.where({ store_id: storeId, item_id: item.id, branch_id: branchId }).first()
-            if (balance) {
-              await db.stock_balances.where({ store_id: storeId, item_id: item.id, branch_id: branchId }).modify({
+            const balance = await db.stock_balances
+              .where('item_id')
+              .equals(item.id)
+              .first()
+
+            if (balance && balance.id) {
+              await db.stock_balances.update(balance.id, {
                 quantity: actual,
                 updated_at: now,
               })
+              syncEngine.enqueueOperation('stock_balances', 'UPDATE', { ...balance, quantity: actual, updated_at: now })
             } else {
-              await db.stock_balances.add({
+              const newSb = {
+                id: crypto.randomUUID(),
                 store_id: storeId,
                 item_id: item.id,
                 branch_id: branchId,
                 quantity: actual,
                 updated_at: now,
-              })
+              }
+              await db.stock_balances.add(newSb)
+              syncEngine.enqueueOperation('stock_balances', 'INSERT', newSb)
             }
 
             // Record adjustment ledger entry

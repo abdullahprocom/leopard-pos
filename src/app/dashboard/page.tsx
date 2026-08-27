@@ -203,18 +203,18 @@ export default function DashboardPage() {
 
     // Low stock alerts
     const lowStockItems = items.filter(item => {
-      if (!item.manage_inventory) return false
-      const alert = item.low_stock_alert || 5
+      if (item.manage_inventory === false) return false
+      const alert = item.min_limit ?? item.low_stock_alert ?? 5
       const balance = stockBalances.find(b => b.item_id === item.id)
-      const qty = balance?.quantity || 0
+      const qty = balance?.quantity ?? 0
       return qty <= alert
     })
 
     // Out of stock
     const outOfStockItems = items.filter(item => {
-      if (!item.manage_inventory) return false
+      if (item.manage_inventory === false) return false
       const balance = stockBalances.find(b => b.item_id === item.id)
-      return (balance?.quantity || 0) <= 0
+      return (balance?.quantity ?? 0) <= 0
     })
 
     return {
@@ -269,13 +269,13 @@ export default function DashboardPage() {
 
   // ─── Low Stock Items for Table ───
   const lowStockList = useMemo(() => {
-    return kpis.lowStockItems.slice(0, 8).map(item => {
+    return kpis.lowStockItems.slice(0, 15).map(item => {
       const balance = stockBalances.find(b => b.item_id === item.id)
       return {
         id: item.id,
         name: item.name,
-        stock: balance?.quantity || 0,
-        alert: item.low_stock_alert || 5,
+        stock: balance?.quantity ?? 0,
+        alert: item.min_limit ?? item.low_stock_alert ?? 5,
         unit: item.unit || 'قطعة',
       }
     })

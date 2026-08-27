@@ -79,72 +79,19 @@ export default function SuperAdminPage() {
     () => db.system_error_logs.reverse().sortBy('created_at')
   ) || []
 
-  // Seed sample data if database is fresh
+  // Clean up legacy sample dummy logs
   useEffect(() => {
-    async function seedDefaults() {
-      const storeCount = await db.tenant_stores.count()
-      if (storeCount === 0) {
-        const sampleStore: TenantStoreRecord = {
-          id: 'store-demo-01',
-          store_name: 'صيدلية النور الحديثة',
-          owner_name: 'د. أحمد مصطفى',
-          owner_phone: '01012345678',
-          business_type: 'pharmacy',
-          status: 'active',
-          token: 'ERP-2026-PHARM-Y01-A99K-8822',
-          created_at: new Date(Date.now() - 12 * 86400000).toISOString(),
-          expires_at: new Date(Date.now() + 353 * 86400000).toISOString(),
-          last_active_at: new Date().toISOString(),
-          total_items: 520,
-          total_sales_count: 1840,
-          total_revenue: 124500
-        }
-        await db.tenant_stores.put(sampleStore)
-      }
-
-      const logCount = await db.system_error_logs.count()
-      if (logCount === 0) {
-        const sampleLogs: SystemErrorLog[] = [
-          {
-            id: 'err-sample-01',
-            store_id: 'store-demo-01',
-            store_name: 'صيدلية النور الحديثة',
-            user_role: 'cashier',
-            severity: 'error',
-            message: 'TypeError: Cannot read properties of undefined (reading "barcode")',
-            stack_trace: 'TypeError: Cannot read properties of undefined (reading "barcode")\n    at handleScanBarcode (pos/page.tsx:142:18)\n    at HTMLInputElement.onKeyDown (pos/page.tsx:210:9)',
-            page_url: '/dashboard/pos',
-            browser_info: 'Chrome 80.0',
-            os_info: 'Windows 7 (Legacy)',
-            is_online: true,
-            resolved: false,
-            created_at: new Date(Date.now() - 35 * 60000).toISOString()
-          },
-          {
-            id: 'err-sample-02',
-            store_id: '00000000-0000-0000-0001-000000000001',
-            store_name: 'سوبر ماركت الهدى',
-            user_role: 'admin',
-            severity: 'network',
-            message: 'SyncEngine: Offline deferred batch write - network timeout',
-            stack_trace: 'FetchError: Failed to fetch Supabase sync endpoint\n    at SyncEngine.processQueue (sync-engine.ts:208:14)',
-            page_url: '/dashboard/items',
-            browser_info: 'Firefox 95.0',
-            os_info: 'Windows 10',
-            is_online: false,
-            resolved: true,
-            resolved_at: new Date(Date.now() - 10 * 60000).toISOString(),
-            resolved_by: 'Super Admin Support',
-            created_at: new Date(Date.now() - 180 * 60000).toISOString()
-          }
-        ]
-        for (const log of sampleLogs) {
-          await db.system_error_logs.put(log)
-        }
-      }
+    async function cleanupDummyLogs() {
+      await db.system_error_logs.where('id').startsWith('err-sample-').delete()
     }
-    seedDefaults()
+    cleanupDummyLogs()
   }, [])
+
+  const handleClearErrorLogs = async () => {
+    if (!confirm('هل أنت متأكد من رغبتك في مسح وتصفير سجل الأخطاء والـ Telemetry بالكامل؟')) return
+    await db.system_error_logs.clear()
+    toast.success('تم مسح سجل الأخطاء بالكامل بنجاح')
+  }
 
   // Handle Token Generation
   const handleGenerateToken = async (e: React.FormEvent) => {
@@ -401,7 +348,7 @@ export default function SuperAdminPage() {
 
           {/* Real-time Telemetry Errors Table */}
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
-            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between flex-wrap gap-3">
               <div>
                 <h3 className="font-black text-sm text-slate-900 dark:text-white flex items-center gap-2">
                   <Bug className="w-4 h-4 text-rose-500" />
@@ -410,6 +357,29 @@ export default function SuperAdminPage() {
                 <p className="text-[11px] text-slate-500 mt-0.5">
                   يتم رصد وحفظ هذه الأخطاء تلقائياً من أجهزة العملاء لتمكين الدعم الفني من حلها مسبقاً
                 </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {errorLogs.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleClearErrorLogs}
+                    className="h-9 px-3 text-xs font-bold border-rose-300 dark:border-rose-800 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 ml-1.5" />
+                    مسح السجل ({errorLogs.length})
+                  </Button>
+                )}
+
+                <Button
+                  type="button"
+                  onClick={() => exportErrorsToCSV(errorLogs)}
+                  className="h-9 px-3.5 text-xs font-bold bg-slate-800 hover:bg-slate-700 text-white rounded-xl cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5 ml-1.5" />
+                  تصدير CSV
+                </Button>
               </div>
             </div>
 
