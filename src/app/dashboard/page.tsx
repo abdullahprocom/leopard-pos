@@ -55,7 +55,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 
-// ─── KPI Stat Card ───
+// Metric Stat Card
 function StatCard({ title, value, icon: Icon, color, trend, trendLabel }: {
   title: string
   value: string
@@ -96,7 +96,7 @@ function StatCard({ title, value, icon: Icon, color, trend, trendLabel }: {
   )
 }
 
-// ─── Dashboard Quick Tiles ───
+// Dashboard Quick Link Tile
 interface DashboardTile {
   title: string
   icon: any
@@ -159,7 +159,7 @@ export default function DashboardPage() {
   const { currentUser, role } = useAuth()
   const currentStoreId = storeId || DEFAULT_STORE_UUID
 
-  // ─── Live Queries strictly isolated by current store (Tenant Isolation) ───
+  // Live Queries (Tenant Isolated)
   const sales = useLiveQuery(() => db.sales.where('store_id').equals(currentStoreId).toArray(), [currentStoreId]) || []
   const saleLines = useLiveQuery(() => db.sale_lines.where('store_id').equals(currentStoreId).toArray(), [currentStoreId]) || []
   const salesReturns = useLiveQuery(() => db.sales_returns.where('store_id').equals(currentStoreId).toArray(), [currentStoreId]) || []
@@ -167,7 +167,7 @@ export default function DashboardPage() {
   const items = useLiveQuery(() => db.items.where('store_id').equals(currentStoreId).toArray(), [currentStoreId]) || []
   const stockBalances = useLiveQuery(() => db.stock_balances.where('store_id').equals(currentStoreId).toArray(), [currentStoreId]) || []
 
-  // ─── Computed KPIs ───
+  // Metric aggregates
   const kpis = useMemo(() => {
     const now = new Date()
     const todayStr = now.toISOString().split('T')[0]
@@ -232,7 +232,7 @@ export default function DashboardPage() {
     }
   }, [sales, saleLines, salesReturns, purchases, items, stockBalances])
 
-  // ─── Sales Chart Data (Last 7 Days) ───
+  // Sales Trend (7-day timeline)
   const chartData = useMemo(() => {
     const days: { label: string; date: string; sales: number; returns: number }[] = []
     const now = new Date()
@@ -260,14 +260,14 @@ export default function DashboardPage() {
     return days
   }, [sales, salesReturns])
 
-  // ─── Recent Invoices (Last 5) ───
+  // Recent Transactions (Last 5)
   const recentInvoices = useMemo(() => {
     return [...sales]
       .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
       .slice(0, 5)
   }, [sales])
 
-  // ─── Low Stock Items for Table ───
+  // Low Stock Items for Table
   const lowStockList = useMemo(() => {
     return kpis.lowStockItems.slice(0, 15).map(item => {
       const balance = stockBalances.find(b => b.item_id === item.id)
@@ -283,7 +283,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-7 pb-12 select-none" dir="rtl">
-      {/* ─── Logixa Pro Standard Welcome Banner ─── */}
+      {/* Welcome Banner & Quick Action */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-gradient-to-bl from-blue-700 via-indigo-700 to-slate-900 p-6 sm:p-7 rounded-3xl shadow-xl shadow-blue-600/20 text-white border border-blue-500/20">
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center text-2xl font-black shadow-inner border border-white/20">
@@ -331,7 +331,7 @@ export default function DashboardPage() {
         </Link>
       </div>
 
-      {/* ─── 2. Real-time KPI Cards Grid ─── */}
+      {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
           title="مبيعات اليوم"
@@ -378,7 +378,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* ─── Charts + Tables Row ─── */}
+      {/* Performance Analytics & Inventory Health */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Sales Chart - Last 7 Days */}
         <div className="xl:col-span-2 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-sm p-5">
@@ -462,7 +462,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ─── Recent Invoices ─── */}
+      {/* Recent Invoices */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-sm overflow-hidden">
         <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800">
           <h2 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
@@ -510,7 +510,7 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* ─── Summary Cards Row ─── */}
+      {/* Overall Summary Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/90 dark:border-slate-800 p-4 text-center">
           <p className="text-3xl font-black text-slate-900 dark:text-white">{kpis.activeItems}</p>
@@ -530,7 +530,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ─── 3. Solid Category Color-Coded Panels (Role Protected & High-Impact Typography) ─── */}
+      {/* Module Navigation Hub */}
       <div className="space-y-5 pt-4">
         <h2 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2.5">
           <Layers className="w-6 h-6 text-blue-600 dark:text-blue-400" />

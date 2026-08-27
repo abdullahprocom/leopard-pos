@@ -514,7 +514,7 @@ export default function SettingsPage() {
 
       </div>
 
-      {/* ─── Confirmation Modal: Reset Entire Store (Factory Reset) ─── */}
+      {/* Modal: Store Factory Reset Confirmation */}
       {isResetAllModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 border-2 border-rose-500 rounded-3xl p-6 w-full max-w-lg shadow-2xl space-y-5 text-right" dir="rtl">
@@ -567,7 +567,7 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* ─── Confirmation Modal: Reset Sales Invoices Only ─── */}
+      {/* Modal: Sales Invoices Reset Confirmation */}
       {isResetSalesModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 border-2 border-amber-500 rounded-3xl p-6 w-full max-w-lg shadow-2xl space-y-5 text-right" dir="rtl">

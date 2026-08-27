@@ -87,10 +87,10 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col lg:flex-row-reverse select-none" dir="rtl">
       
-      {/* ─── 1. Form Section (RIGHT Side in RTL layout - Matches Image 3) ─── */}
+      {/* Login Authentication Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-10 lg:p-14 bg-gradient-to-b from-slate-950 via-[#0a1222] to-slate-950 min-h-screen relative overflow-hidden">
         
-        {/* Subtle Ambient Background Glow */}
+        {/* Ambient Glow */}
         <div className="absolute -top-40 -left-40 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none" />
 
@@ -215,7 +215,7 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* ─── 2. Deep Royal Navy Blue Showcase (LEFT Side in RTL layout - Matches Image 3) ─── */}
+      {/* Brand Showcase Panel */}
       <div className="w-full lg:w-1/2 bg-gradient-to-br from-[#0c234a] via-[#0f2d5e] to-[#071329] text-white flex flex-col items-center justify-between p-8 sm:p-12 lg:p-16 text-center border-t lg:border-t-0 lg:border-r border-blue-900/40 relative overflow-hidden">
         
         {/* Background Decorative Rings */}

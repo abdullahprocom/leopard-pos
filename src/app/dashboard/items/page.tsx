@@ -47,7 +47,7 @@ export default function ItemsPage() {
   const { storeId } = useStore()
   const currentStoreId = storeId || DEFAULT_STORE_UUID
 
-  // ─── Search & Filter State ───
+  // Search and filter parameters
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all')
@@ -58,12 +58,12 @@ export default function ItemsPage() {
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [filterAvailableOnly, setFilterAvailableOnly] = useState(false)
 
-  // ─── Table State ───
+  // Table pagination & density
   const [currentPage, setCurrentPage] = useState(1)
   const [rowsPerPage, setRowsPerPage] = useState(25)
   const [density, setDensity] = useState<TableDensity>('comfortable')
 
-  // ─── Data Fetching ───
+  // Live Queries (Tenant Isolated)
   const categories = useLiveQuery(
     () => db.categories.where('store_id').equals(currentStoreId).sortBy('sort_order'),
     [currentStoreId]
@@ -90,7 +90,7 @@ export default function ItemsPage() {
     })).reverse()
   }, [currentStoreId, categories]) || []
 
-  // ─── Computed Stats ───
+  // Computed summary metrics
   const stats = useMemo(() => {
     const total = rawItemsData.length
     const lowStock = rawItemsData.filter(i => i.manage_inventory && i.current_stock > 0 && i.current_stock <= (i.low_stock_alert || 0)).length
@@ -108,7 +108,7 @@ export default function ItemsPage() {
   const uniqueUnits = useMemo(() => [...new Set(rawItemsData.map(i => i.unit).filter(Boolean))], [rawItemsData])
   const uniqueManufacturers = useMemo(() => [...new Set(rawItemsData.map(i => i.manufacturer).filter(Boolean) as string[])], [rawItemsData])
 
-  // ─── Filter Logic ───
+  // Filter evaluation logic
   const filteredItems = useMemo(() => {
     let items = [...rawItemsData]
 
@@ -145,7 +145,7 @@ export default function ItemsPage() {
     return items
   }, [rawItemsData, quickFilter, searchQuery, selectedCategory, filterUnit, filterManufacturer, filterItemType, filterStatus, filterAvailableOnly])
 
-  // ─── Pagination ───
+  // Pagination calculation
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / rowsPerPage))
   const paginatedItems = filteredItems.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage)
   const startIndex = (currentPage - 1) * rowsPerPage + 1

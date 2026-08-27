@@ -213,7 +213,7 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6 pb-12 select-none" dir="rtl">
-      {/* ─── Header ─── */}
+      {/* Report Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-sm print:hidden">
         <div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
@@ -246,13 +246,13 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {/* ─── Print Header (Only visible when printing) ─── */}
+      {/* Print Header */}
       <div className="hidden print:block text-center border-b pb-4 mb-4">
         <h1 className="text-2xl font-black">تقرير المبيعات والأرباح — ERP System</h1>
         <p className="text-sm text-slate-600">الفترة: {periodLabels[period]} | تاريخ الطباعة: {new Date().toLocaleString('ar-EG')}</p>
       </div>
 
-      {/* ─── Key Financial KPIs Row ─── */}
+      {/* Key Financial KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Gross Sales */}
         <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-sm">
@@ -303,7 +303,7 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {/* ─── Inventory Valuation Card ─── */}
+      {/* Inventory Valuation Card */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-sm p-6">
         <h2 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2 mb-4">
           <Boxes className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
@@ -329,7 +329,7 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {/* ─── Charts & Top Selling Grid ─── */}
+      {/* Charts & Sales Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Top Selling Items */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-sm p-6">
@@ -399,7 +399,7 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {/* ─── Payment Methods Summary ─── */}
+      {/* Payment Methods Summary */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-sm p-6">
         <h2 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2 mb-4">
           <CreditCard className="w-5 h-5 text-sky-600 dark:text-sky-400" />

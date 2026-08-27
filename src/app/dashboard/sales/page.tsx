@@ -49,7 +49,7 @@ export default function SalesListPage() {
   const { storeId, storeName } = useStore()
   const currentStoreId = storeId || DEFAULT_STORE_UUID
 
-  // ─── Filter & Search State ───
+  // Filter and search parameters
   const [searchTerm, setSearchTerm] = useState('')
   const [quickFilter, setQuickFilter] = useState<SalesQuickFilter>('all')
   const [paymentFilter, setPaymentFilter] = useState<string>('all')
@@ -85,7 +85,7 @@ export default function SalesListPage() {
     }
   }
 
-  // ─── Table State ───
+  // Table pagination state
   const [currentPage, setCurrentPage] = useState(1)
   const [rowsPerPage, setRowsPerPage] = useState(25)
   const [density, setDensity] = useState<TableDensity>('comfortable')
@@ -545,7 +545,7 @@ export default function SalesListPage() {
         )}
       </div>
 
-      {/* ─── Details Modal ─── */}
+      {/* Details Modal */}
       {selectedSale && !isThermalModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fadeIn">
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-xl overflow-hidden p-6 space-y-5 animate-scaleIn">
@@ -613,7 +613,7 @@ export default function SalesListPage() {
         </div>
       )}
 
-      {/* ─── Thermal Receipt Modal ─── */}
+      {/* Thermal Receipt Modal */}
       {isThermalModalOpen && selectedSale && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
           <div className="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 text-black animate-scaleIn">
@@ -675,7 +675,7 @@ export default function SalesListPage() {
         </div>
       )}
 
-      {/* ─── Confirmation Modal: Clear All Sales ─── */}
+      {/* Confirmation Modal: Clear Invoices */}
       {isClearAllModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 border-2 border-rose-500 rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4 text-right" dir="rtl">

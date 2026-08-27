@@ -48,7 +48,7 @@ function exportErrorsToCSV(logs: SystemErrorLog[]) {
 export default function SuperAdminPage() {
   const [activeTab, setActiveTab] = useState<'errors' | 'stores' | 'tokens'>('errors')
 
-  // ─── Token Generator Form State ───
+  // License token generation state
   const [tokenType, setTokenType] = useState<BusinessType>('pharmacy')
   const [tokenDuration, setTokenDuration] = useState<LicenseDuration>('1_year')
   const [tokenClientName, setTokenClientName] = useState('')
@@ -57,16 +57,16 @@ export default function SuperAdminPage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [copiedToken, setCopiedToken] = useState<string | null>(null)
 
-  // ─── Errors & Telemetry Filter State ───
+  // Telemetry log filters
   const [errorSearch, setErrorSearch] = useState('')
   const [errorSeverityFilter, setErrorSeverityFilter] = useState<string>('all')
   const [errorStatusFilter, setErrorStatusFilter] = useState<'all' | 'unresolved' | 'resolved'>('all')
   const [selectedError, setSelectedError] = useState<SystemErrorLog | null>(null)
 
-  // ─── Stores Search State ───
+  // Tenant search
   const [storeSearch, setStoreSearch] = useState('')
 
-  // ─── Database Live Queries ───
+  // Live Database Queries
   const tokens = useLiveQuery(
     () => db.license_tokens.reverse().sortBy('created_at')
   ) || []
@@ -300,7 +300,7 @@ export default function SuperAdminPage() {
         </button>
       </div>
 
-      {/* ═══════ Tab 1: Silent Error & Bug Logger ═══════ */}
+      {/* Tab: System Error Telemetry */}
       {activeTab === 'errors' && (
         <div className="space-y-4 animate-fadeIn">
           {/* Search & Filters */}
@@ -478,7 +478,7 @@ export default function SuperAdminPage() {
         </div>
       )}
 
-      {/* ═══════ Tab 2: Subscribed Stores ═══════ */}
+      {/* Tab: Subscribed Tenant Stores */}
       {activeTab === 'stores' && (
         <div className="space-y-4 animate-fadeIn">
           {/* Search bar */}
@@ -561,7 +561,7 @@ export default function SuperAdminPage() {
         </div>
       )}
 
-      {/* ═══════ Tab 3: Token Generator ═══════ */}
+      {/* Tab: License Token Management */}
       {activeTab === 'tokens' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 animate-fadeIn">
           {/* Generator Form */}
@@ -713,7 +713,7 @@ export default function SuperAdminPage() {
         </div>
       )}
 
-      {/* ─── Stack Trace Detail Modal ─── */}
+      {/* Modal: Telemetry Error Stack Trace */}
       {selectedError && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-fadeIn">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-2xl w-full text-white space-y-4 shadow-2xl">

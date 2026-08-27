@@ -491,7 +491,7 @@ export default function EmployeesPage() {
         </div>
       </div>
 
-      {/* ─── Modal: Edit Employee & Change Password ─── */}
+      {/* Modal: Edit Employee Credentials & Permissions */}
       {editModalOpen && editingEmp && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-lg overflow-hidden p-6 sm:p-8 space-y-6 animate-scaleIn">

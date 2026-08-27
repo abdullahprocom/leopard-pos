@@ -118,7 +118,7 @@ export default function POSPage() {
   const currentStoreId = storeId || DEFAULT_STORE_UUID
   const currentBranchId = branchId || DEFAULT_BRANCH_UUID
 
-  // ─── Live Queries ───
+  // Live Queries (Tenant Isolated)
   const allItems = useLiveQuery(
     () => db.items.where('store_id').equals(currentStoreId).filter(i => i.status === 'active').toArray(),
     [currentStoreId]
@@ -772,7 +772,7 @@ export default function POSPage() {
   return (
     <div className="fixed inset-0 z-40 bg-[#070e1c] text-white flex flex-col font-sans select-none overflow-hidden" dir="rtl">
       
-      {/* ─── 1. TOP APP BAR ─── */}
+      {/* Header Application Bar */}
       <div className="bg-[#0b1528] border-b border-slate-800 px-4 py-2.5 flex items-center justify-between gap-3 shadow-md">
         
         {/* Left Side: Logo & Status */}
@@ -876,7 +876,7 @@ export default function POSPage() {
 
       </div>
 
-      {/* ─── 2. SEARCH & CUSTOMER BAR ─── */}
+      {/* Search & Customer Selection Bar */}
       <div className="bg-[#0b1528] border-b border-slate-800 px-5 py-3.5 flex items-center justify-between gap-4 flex-wrap shadow-sm">
         
         {/* Search Bar */}
@@ -964,7 +964,7 @@ export default function POSPage() {
 
       </div>
 
-      {/* ─── 3. QUICK ITEMS GALLERY ─── */}
+      {/* Quick Items Gallery */}
       {showQuickItems && (
         <div className="bg-[#0b1528] border-b border-slate-800 p-4 space-y-3 animate-fadeIn">
           <div className="flex items-center gap-2 overflow-x-auto pb-1.5">
@@ -1019,7 +1019,7 @@ export default function POSPage() {
         </div>
       )}
 
-      {/* ─── 4. MAIN CART DISPLAY ─── */}
+      {/* Main Cart Items Table */}
       <div className="flex-1 flex flex-col p-4 overflow-y-auto min-h-[340px]">
         {cart.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-500 space-y-4 my-auto">
@@ -1172,7 +1172,7 @@ export default function POSPage() {
         )}
       </div>
 
-      {/* ─── 5. FIXED BOTTOM SUMMARY & CHECKOUT ACTIONS ─── */}
+      {/* Checkout Summary & Action Buttons */}
       <div className="bg-[#0b1528] border-t border-slate-800 p-4 space-y-3.5 shadow-2xl">
         
         {/* Figures & Summary Labels */}
@@ -1264,7 +1264,7 @@ export default function POSPage() {
 
       </div>
 
-      {/* ─── 6. MODALS ─── */}
+      {/* POS Interaction Modals */}
       {/* Weight Scale Modal */}
       <WeightScaleModal
         isOpen={scaleModalOpen}

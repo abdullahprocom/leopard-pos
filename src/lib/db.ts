@@ -287,7 +287,7 @@ export async function ensureDefaultCategories(
   }
 }
 
-// 💥 Factory Reset / Wipe Entire Store Data
+// Complete tenant store data wipe & factory re-initialization
 export async function resetStoreEntireData(
   storeId: string, 
   businessType: BusinessType = 'supermarket'
