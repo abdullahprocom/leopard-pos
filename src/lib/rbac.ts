@@ -42,6 +42,7 @@ const ROLE_PAGE_ACCESS: Record<string, string[]> = {
     '/dashboard/pos',
     '/dashboard/sales',
     '/dashboard/sales-returns',
+    '/dashboard/shifts',
     '/dashboard/customers',
     '/dashboard/suppliers',
     '/dashboard/employees',
@@ -52,6 +53,7 @@ const ROLE_PAGE_ACCESS: Record<string, string[]> = {
     '/dashboard/purchases',
     '/dashboard/sales',
     '/dashboard/sales-returns',
+    '/dashboard/shifts',
     '/dashboard/customers',
     '/dashboard/suppliers',
   ],
@@ -72,6 +74,7 @@ const ROLE_OPERATIONS: Record<string, string[]> = {
     'create_sale', 'void_sale',
     'create_return', 'process_return',
     'stocktaking', 'stock_transfer',
+    'open_shift', 'close_shift', 'view_shifts', 'reconcile_shifts',
     'view_reports',
   ],
   accountant: [
@@ -79,12 +82,15 @@ const ROLE_OPERATIONS: Record<string, string[]> = {
     'view_purchases', 'create_purchase',
     'view_sales',
     'view_returns',
+    'view_shifts', 'reconcile_shifts',
     'view_reports',
   ],
   cashier: [
     'create_sale',
     'create_return',
     'view_own_sales',
+    'open_shift',
+    'close_shift',
   ],
 }
 
@@ -94,7 +100,17 @@ const ROLE_HIDDEN_UI: Record<string, string[]> = {
   admin: [],
   manager: ['btn_system_settings', 'btn_delete_store'],
   accountant: ['btn_edit_price', 'btn_delete_item', 'btn_void_invoice', 'btn_system_settings'],
-  cashier: ['btn_edit_price', 'btn_delete_item', 'btn_void_invoice', 'btn_system_settings', 'btn_manage_employees', 'section_cost_price'],
+  cashier: [
+    'btn_edit_price', 
+    'btn_delete_item', 
+    'btn_void_invoice', 
+    'btn_system_settings', 
+    'btn_manage_employees', 
+    'section_cost_price',
+    'section_expected_cash',
+    'section_shift_difference',
+    'link_shifts_history'
+  ],
 }
 
 /** Check if a role can access a specific page */

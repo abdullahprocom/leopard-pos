@@ -5,7 +5,18 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, getDeviceId } from '@/lib/db'
-import { generateSaleNumber, cleanPositiveQuantity, cleanPositivePrice, cleanPositiveDiscount, money, formatCurrency } from '@/lib/finance'
+import { 
+  generateSaleNumber, 
+  cleanPositiveQuantity, 
+  cleanPositivePrice, 
+  cleanPositiveDiscount, 
+  money, 
+  formatCurrency,
+  isScaleBarcode,
+  parseScaleBarcode
+} from '@/lib/finance'
+import { ShiftService } from '@/lib/shift-service'
+import type { CashierShift } from '@/lib/types'
 import { syncEngine, DEFAULT_STORE_UUID, DEFAULT_BRANCH_UUID } from '@/lib/sync-engine'
 import { useStore } from '@/lib/store-context'
 import { useAuth } from '@/lib/auth-context'
@@ -114,9 +125,79 @@ export default function POSPage() {
   const [recentSalesModalOpen, setRecentSalesModalOpen] = useState(false)
   const [shiftModalOpen, setShiftModalOpen] = useState(false)
 
+  // Shift Management States (Blind Shift Closing)
+  const [activeShift, setActiveShift] = useState<CashierShift | null>(null)
+  const [isOpenShiftModalOpen, setIsOpenShiftModalOpen] = useState(false)
+  const [isBlindCloseModalOpen, setIsBlindCloseModalOpen] = useState(false)
+  const [initialDrawerCash, setInitialDrawerCash] = useState('0')
+  const [actualDrawerCash, setActualDrawerCash] = useState('')
+  const [shiftClosingNotes, setShiftClosingNotes] = useState('')
+  const [isShiftSubmitting, setIsShiftSubmitting] = useState(false)
+
   const searchInputRef = useRef<HTMLInputElement>(null)
   const currentStoreId = storeId || DEFAULT_STORE_UUID
   const currentBranchId = branchId || DEFAULT_BRANCH_UUID
+
+  // Check and load active cashier shift on mount / login
+  useEffect(() => {
+    async function checkShift() {
+      if (!currentStoreId) return
+      const cashierId = currentUser?.id || 'cashier'
+      const shift = await ShiftService.getActiveShift(currentStoreId, cashierId)
+      if (shift) {
+        setActiveShift(shift)
+      } else {
+        setIsOpenShiftModalOpen(true)
+      }
+    }
+    checkShift()
+  }, [currentStoreId, currentUser?.id])
+
+  // Open shift handler
+  const handleOpenShift = async () => {
+    try {
+      setIsShiftSubmitting(true)
+      const cashierId = currentUser?.id || 'cashier'
+      const cashierName = currentUser?.name || 'كاشير'
+      const shift = await ShiftService.openShift(
+        currentStoreId,
+        currentBranchId,
+        cashierId,
+        cashierName,
+        parseFloat(initialDrawerCash) || 0
+      )
+      setActiveShift(shift)
+      setIsOpenShiftModalOpen(false)
+      toast.success(`تم فتح الوردية بنجاح (${shift.shift_number || ''})`)
+    } catch (err: any) {
+      toast.error('حدث خطأ أثناء فتح الوردية: ' + err.message)
+    } finally {
+      setIsShiftSubmitting(false)
+    }
+  }
+
+  // Blind close shift handler
+  const handleBlindCloseShift = async () => {
+    if (!activeShift) return
+    const actual = parseFloat(actualDrawerCash)
+    if (isNaN(actual) || actual < 0) {
+      toast.error('يرجى إدخال مبلغ النقدية الفعلي في الدرج بشكل صحيح')
+      return
+    }
+
+    try {
+      setIsShiftSubmitting(true)
+      await ShiftService.closeShift(activeShift.id, actual, shiftClosingNotes)
+      toast.success('تم إغلاق الوردية وحفظ بيانات المطابقة بنجاح')
+      setIsBlindCloseModalOpen(false)
+      setActiveShift(null)
+      router.push('/dashboard')
+    } catch (err: any) {
+      toast.error('حدث خطأ أثناء إغلاق الوردية: ' + err.message)
+    } finally {
+      setIsShiftSubmitting(false)
+    }
+  }
 
   // Live Queries (Tenant Isolated)
   const allItems = useLiveQuery(
@@ -233,13 +314,58 @@ export default function POSPage() {
   const handleSearchKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && searchTerm.trim()) {
       e.preventDefault()
-      const query = searchTerm.trim().toLowerCase()
+      const rawQuery = searchTerm.trim()
+      const query = rawQuery.toLowerCase()
+
+      // 1. Electronic Scale Barcode Parsing (EAN-13 Embedded Weight or Price)
+      if (isScaleBarcode(rawQuery)) {
+        const scaleResult = parseScaleBarcode(rawQuery)
+        if (scaleResult.isValid && scaleResult.itemCode) {
+          // Find item by scale_item_code, barcode, or SKU
+          let scaleItem = await db.items.where('scale_item_code').equals(scaleResult.itemCode).first()
+          if (!scaleItem) {
+            const numericCode = String(parseInt(scaleResult.itemCode, 10))
+            if (numericCode !== scaleResult.itemCode) {
+              scaleItem = await db.items.where('scale_item_code').equals(numericCode).first()
+            }
+          }
+          if (!scaleItem) {
+            const bRecord = await db.item_barcodes.where('barcode').equals(scaleResult.itemCode).first()
+            if (bRecord) {
+              scaleItem = await db.items.get(bRecord.item_id)
+            }
+          }
+          if (!scaleItem) {
+            scaleItem = await db.items.where('sku').equals(scaleResult.itemCode).first()
+          }
+
+          if (scaleItem) {
+            if (scaleResult.type === 'weight' && scaleResult.weight !== undefined) {
+              const weightQty = scaleResult.weight
+              addToCart(scaleItem, weightQty, scaleItem.unit || 'كيلو جرام', scaleItem.sell_price, 1)
+              toast.success(`تم قراءة الوزن من الميزان: ${weightQty} كجم (${scaleItem.name})`)
+              setSearchTerm('')
+              return
+            } else if (scaleResult.type === 'price' && scaleResult.price !== undefined) {
+              const totalPrice = scaleResult.price
+              const calcWeight = scaleItem.sell_price > 0 
+                ? Math.round((totalPrice / scaleItem.sell_price + Number.EPSILON) * 1000) / 1000 
+                : 1
+              addToCart(scaleItem, calcWeight, scaleItem.unit || 'كيلو جرام', scaleItem.sell_price, 1)
+              toast.success(`تم قراءة السعر من الميزان: ${totalPrice} ج.م (${calcWeight} كجم)`)
+              setSearchTerm('')
+              return
+            }
+          }
+        }
+      }
+
       let item: any = null
       let matchedUnitName: string | undefined = undefined
       let matchedMultiplier: number = 1
       let matchedPrice: number | undefined = undefined
 
-      // 1. Search in item_barcodes
+      // 2. Search in item_barcodes
       const barcodeRecord = await db.item_barcodes.where('barcode').equals(query).first()
       if (barcodeRecord) {
         item = await db.items.get(barcodeRecord.item_id)
@@ -250,7 +376,7 @@ export default function POSPage() {
         }
       }
 
-      // 2. Or search by SKU or name
+      // 3. Or search by SKU or name
       if (!item) {
         item = await db.items.where('sku').equals(query).first()
       }
@@ -569,6 +695,8 @@ export default function POSPage() {
       id: crypto.randomUUID(),
       store_id: currentStoreId,
       branch_id: currentBranchId,
+      shift_id: activeShift?.id || undefined,
+      cashier_id: currentUser?.id || undefined,
       type: 'expense',
       transaction_type: 'expense_out',
       amount: num,
@@ -625,6 +753,8 @@ export default function POSPage() {
         id: saleId,
         store_id: currentStoreId,
         branch_id: currentBranchId,
+        shift_id: activeShift?.id || undefined,
+        cashier_id: currentUser?.id || undefined,
         invoice_number: invoiceNumber,
         customer_id: selectedCustomerId || undefined,
         customer_name: customerName || 'عميل نقدي',
@@ -724,6 +854,8 @@ export default function POSPage() {
             id: crypto.randomUUID(),
             store_id: currentStoreId,
             branch_id: currentBranchId,
+            shift_id: activeShift?.id || undefined,
+            cashier_id: currentUser?.id || undefined,
             type: 'sale',
             transaction_type: 'sale_in',
             amount: parsedPaid,
@@ -864,13 +996,26 @@ export default function POSPage() {
             <Calculator className="w-4 h-4" />
           </button>
 
+          {activeShift && (
+            <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 text-slate-300 text-[11px] font-mono font-bold border border-slate-700">
+              <Clock className="w-3 h-3 text-emerald-400" />
+              وردية: {activeShift.shift_number || activeShift.id.slice(0, 8)}
+            </span>
+          )}
+
           <button
             type="button"
-            onClick={() => setShiftModalOpen(true)}
+            onClick={() => {
+              if (activeShift) {
+                setIsBlindCloseModalOpen(true)
+              } else {
+                setIsOpenShiftModalOpen(true)
+              }
+            }}
             className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-black flex items-center gap-1.5 shadow-md shadow-rose-600/20 cursor-pointer"
           >
             <LogOut className="w-3.5 h-3.5" />
-            <span>إغلاق الوردية</span>
+            <span>{activeShift ? 'إغلاق الوردية' : 'فتح وردية'}</span>
           </button>
         </div>
 
@@ -1439,50 +1584,161 @@ export default function POSPage() {
         </div>
       )}
 
-      {/* Shift Modal */}
-      {shiftModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0b1528] border border-slate-700 rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4 text-right">
+      {/* 1. Open Shift Modal (Mandatory before starting sales) */}
+      {isOpenShiftModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#0b1528] border-2 border-blue-500 rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-5 text-right" dir="rtl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="text-lg font-black text-white flex items-center gap-2">
-                <Clock className="w-5 h-5 text-amber-400" />
-                ملخص وإغلاق الوردية الحالية
+                <Clock className="w-5 h-5 text-blue-400 animate-pulse" />
+                فتح وردية بيع جديدة (Open Shift)
+              </h3>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-[#13223d] border border-slate-700 space-y-3 text-xs leading-relaxed">
+              <div className="flex justify-between">
+                <span className="text-slate-400">الكاشير:</span>
+                <span className="font-bold text-white text-sm">{currentUser?.name || 'كاشير'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">المتجر / الفرع:</span>
+                <span className="font-bold text-slate-300">{storeName || 'المتجر الرئيسي'}</span>
+              </div>
+              <p className="text-slate-400 pt-1 border-t border-slate-700/60 font-medium">
+                يرجى إدخال رصيد بداية الدرج (العهدة النقدية الافتتاحية المخصصة للفكة والمصروفات).
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-300 block">
+                رصيد بداية الدرج (ج.م) *
+              </label>
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={initialDrawerCash}
+                onChange={e => setInitialDrawerCash(e.target.value.replace(/[^0-9.]/g, ''))}
+                placeholder="0.00"
+                className="h-12 bg-[#13223d] border-slate-700 text-white font-mono font-bold text-lg text-center"
+                autoFocus
+              />
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.push('/dashboard')}
+                className="flex-1 border-slate-700 text-slate-400 hover:text-white"
+              >
+                العودة للرئيسية
+              </Button>
+              <Button
+                type="button"
+                disabled={isShiftSubmitting}
+                onClick={handleOpenShift}
+                className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold h-11 rounded-xl shadow-lg shadow-blue-600/30"
+              >
+                {isShiftSubmitting ? 'جاري الفتح...' : 'بدء الوردية والبيع'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. Blind Shift Closing Modal (Cashier enters counted cash only without seeing totals) */}
+      {isBlindCloseModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#0b1528] border-2 border-rose-500 rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-5 text-right" dir="rtl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="text-lg font-black text-white flex items-center gap-2">
+                <LogOut className="w-5 h-5 text-rose-500" />
+                إغلاق الوردية وقفل الدرج (Blind Shift Close)
               </h3>
               <button
                 type="button"
-                onClick={() => setShiftModalOpen(false)}
+                onClick={() => setIsBlindCloseModalOpen(false)}
                 className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="space-y-2 bg-[#13223d] p-4 rounded-xl border border-slate-700 text-xs">
-              <p><strong className="text-slate-400">الكاشير المسؤول:</strong> {currentUser?.name || 'كاشير'}</p>
-              <p><strong className="text-slate-400">الفرع / المتجر:</strong> {storeName || 'المتجر الرئيسي'}</p>
-              <p><strong className="text-slate-400">عدد الفواتير الصادرة اليوم:</strong> {recentSalesList.length}</p>
-              <p><strong className="text-slate-400">إجمالي المبيعات النقدية:</strong> <span className="font-mono text-emerald-400 font-bold">{recentSalesList.reduce((acc, s) => acc + (s.total || 0), 0).toFixed(2)} ج.م</span></p>
+            <div className="p-4 rounded-2xl bg-rose-950/20 border border-rose-900/40 space-y-2 text-xs leading-relaxed text-rose-200">
+              <p className="font-black text-rose-400 flex items-center gap-1.5">
+                <AlertTriangle className="w-4 h-4" />
+                إغلاق أعمى مؤمن لحماية الدرج (Blind Cash Count):
+              </p>
+              <p className="text-slate-300 font-medium">
+                قم بعد جميع الأوراق النقدية والعملات الموجودة في الدرج وأدخل الإجمالي الفعلي.
+                لا تظهر إجماليات المبيعات هنا لمنع التلاعب وضمان دقة المطابقة المحاسبية مع الإدارة.
+              </p>
             </div>
 
-            <div className="flex gap-2">
+            <div className="p-3 rounded-xl bg-[#13223d] border border-slate-700 space-y-1 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-400">الكاشير:</span>
+                <span className="font-bold text-white">{currentUser?.name || 'كاشير'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">رقم الوردية:</span>
+                <span className="font-mono text-slate-300">{activeShift?.shift_number || activeShift?.id.slice(0, 8)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">وقت البدء:</span>
+                <span className="font-mono text-slate-300">
+                  {activeShift?.opened_at ? new Date(activeShift.opened_at).toLocaleTimeString('ar-EG') : '-'}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-300 block">
+                  النقدية الفعلية الموجودة في الدرج (ج.م) *
+                </label>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  value={actualDrawerCash}
+                  onChange={e => setActualDrawerCash(e.target.value.replace(/[^0-9.]/g, ''))}
+                  placeholder="0.00"
+                  className="h-12 bg-[#13223d] border-slate-700 text-white font-mono font-black text-xl text-center focus:border-rose-500"
+                  autoFocus
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-400 block">
+                  ملاحظات إغلاق الوردية (اختياري)
+                </label>
+                <Input
+                  type="text"
+                  value={shiftClosingNotes}
+                  onChange={e => setShiftClosingNotes(e.target.value)}
+                  placeholder="أي ملاحظات أو فوارق فكة..."
+                  className="h-10 bg-[#13223d] border-slate-700 text-white text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setShiftModalOpen(false)}
-                className="flex-1 border-slate-700 text-slate-300"
+                disabled={isShiftSubmitting}
+                onClick={() => setIsBlindCloseModalOpen(false)}
+                className="flex-1 border-slate-700 text-slate-400 hover:text-white"
               >
                 إلغاء
               </Button>
               <Button
                 type="button"
-                onClick={() => {
-                  toast.success('تم إغلاق الوردية وطباعة تقرير التقفيل اليومي')
-                  setShiftModalOpen(false)
-                  router.push('/dashboard')
-                }}
-                className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-bold"
+                disabled={isShiftSubmitting}
+                onClick={handleBlindCloseShift}
+                className="flex-1 bg-rose-600 hover:bg-rose-500 text-white font-bold h-11 rounded-xl shadow-lg shadow-rose-600/30"
               >
-                تأكيد وتقفيل الوردية
+                {isShiftSubmitting ? 'جاري الإغلاق...' : 'تأكيد إغلاق الوردية'}
               </Button>
             </div>
           </div>

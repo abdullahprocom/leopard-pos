@@ -1,16 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { Cairo } from "next/font/google";
 import { Toaster } from "sonner";
 import { StoreProvider } from "@/lib/store-context";
 import { AuthProvider } from "@/lib/auth-context";
 import "./globals.css";
-
-const cairo = Cairo({
-  subsets: ["arabic", "latin"],
-  weight: ["300", "400", "500", "600", "700", "800", "900"],
-  variable: "--font-cairo",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "ERP System - منظومة الكاشير وإدارة المخازن المتكاملة",
@@ -27,8 +19,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ar" dir="rtl" className={`dark h-full antialiased ${cairo.variable}`}>
-      <body className={`min-h-full flex flex-col font-sans ${cairo.className} bg-slate-950 text-slate-100`}>
+    <html lang="ar" dir="rtl" className="dark h-full antialiased">
+      <body className="min-h-full flex flex-col font-sans bg-slate-950 text-slate-100">
         <StoreProvider>
           <AuthProvider>
             {children}

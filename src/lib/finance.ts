@@ -114,6 +114,81 @@ export function generateStocktakingNumber(): string {
   return generateSequenceNumber('ERP-STK')
 }
 
+/** Generate shift number */
+export function generateShiftNumber(): string {
+  return generateSequenceNumber('ERP-SHF')
+}
+
+/** Standard prefixes for electronic weight scales (EAN-13) */
+export const SCALE_BARCODE_PREFIXES = ['20', '21', '22', '23', '24', '27', '28', '99']
+
+/** Check if scanned barcode is an electronic scale barcode */
+export function isScaleBarcode(barcode: string): boolean {
+  if (!barcode || typeof barcode !== 'string') return false
+  const clean = barcode.trim()
+  if (clean.length < 12 || clean.length > 13) return false
+  const prefix2 = clean.slice(0, 2)
+  return SCALE_BARCODE_PREFIXES.includes(prefix2)
+}
+
+/**
+ * Parse embedded-weight or embedded-price EAN-13 scale barcode
+ * Format: [PP][IIIII][WWWWW][C]
+ * PP = Prefix (20, 21, 22, 28, 99 for weight; 27 for price)
+ * IIIII = 5-digit item code
+ * WWWWW = 5-digit weight in grams (e.g. 01250 = 1.250 kg)
+ * PPPPP = 5-digit price in cents/piastres (e.g. 02550 = 25.50)
+ * C = Check digit
+ */
+export function parseScaleBarcode(barcode: string): {
+  isValid: boolean
+  prefix: string
+  itemCode: string
+  weight?: number
+  price?: number
+  type: 'weight' | 'price'
+  rawBarcode: string
+} {
+  const clean = (barcode || '').trim()
+  if (!isScaleBarcode(clean)) {
+    return {
+      isValid: false,
+      prefix: '',
+      itemCode: '',
+      type: 'weight',
+      rawBarcode: clean,
+    }
+  }
+
+  const prefix = clean.slice(0, 2)
+  const itemCode = clean.slice(2, 7)
+  const valuePart = clean.slice(7, 12)
+
+  if (prefix === '27') {
+    const rawPrice = parseInt(valuePart, 10) || 0
+    const price = money(rawPrice / 100)
+    return {
+      isValid: true,
+      prefix,
+      itemCode,
+      price,
+      type: 'price',
+      rawBarcode: clean,
+    }
+  }
+
+  const rawGrams = parseInt(valuePart, 10) || 0
+  const weight = Math.round((rawGrams / 1000 + Number.EPSILON) * 1000) / 1000
+  return {
+    isValid: true,
+    prefix,
+    itemCode,
+    weight,
+    type: 'weight',
+    rawBarcode: clean,
+  }
+}
+
 /** Format currency with Arabic locale */
 export function formatCurrency(amount: number, currency = 'EGP'): string {
   return new Intl.NumberFormat('ar-EG', {

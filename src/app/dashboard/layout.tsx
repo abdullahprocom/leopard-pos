@@ -34,6 +34,7 @@ import {
   FileSpreadsheet,
   DollarSign,
   Server,
+  Wallet,
 } from 'lucide-react'
 import { OnlineStatus } from '@/components/OnlineStatus'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -57,6 +58,7 @@ const navLinks = [
   { label: 'النقل المخزني', href: '/dashboard/transfers', icon: ArrowLeftRight, roles: ['admin', 'supervisor'] },
   { label: 'سجل المبيعات', href: '/dashboard/sales', icon: Receipt, roles: ['admin', 'supervisor', 'cashier'] },
   { label: 'مرتجع المبيعات', href: '/dashboard/sales-returns', icon: RotateCcw, roles: ['admin', 'supervisor', 'cashier'] },
+  { label: 'الورديات ومطابقة الدرج', href: '/dashboard/shifts', icon: Wallet, roles: ['admin', 'supervisor'] },
   { label: 'عروض الأسعار', href: '/dashboard/quotations', icon: FileSpreadsheet, roles: ['admin', 'supervisor', 'cashier'] },
   { label: 'العملاء', href: '/dashboard/customers', icon: Users, roles: ['admin', 'supervisor', 'cashier'] },
   { label: 'الموردين', href: '/dashboard/suppliers', icon: Building2, roles: ['admin', 'supervisor'] },

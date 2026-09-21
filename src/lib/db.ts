@@ -341,7 +341,72 @@ export async function resetStoreEntireData(
   })
 }
 
-// 🗑️ Delete all Sales Invoices and related cash inflow for a store
+// Tier 2: Purge transactions, zero stock & customer/supplier balances, reset prices to 0 (Keep items structure)
+export async function resetTransactionsKeepItems(storeId: string): Promise<void> {
+  await Promise.all([
+    db.sales.where('store_id').equals(storeId).delete(),
+    db.sale_lines.where('store_id').equals(storeId).delete(),
+    db.sales_returns.where('store_id').equals(storeId).delete(),
+    db.sales_return_lines.where('store_id').equals(storeId).delete(),
+    db.purchases.where('store_id').equals(storeId).delete(),
+    db.purchase_lines.where('store_id').equals(storeId).delete(),
+    db.purchase_returns.where('store_id').equals(storeId).delete(),
+    db.purchase_return_lines.where('store_id').equals(storeId).delete(),
+    db.cash_transactions.where('store_id').equals(storeId).delete(),
+    db.cashier_shifts.where('store_id').equals(storeId).delete(),
+    db.stocktaking.where('store_id').equals(storeId).delete(),
+    db.stocktaking_lines.where('store_id').equals(storeId).delete(),
+    db.stock_transfers.where('store_id').equals(storeId).delete(),
+    db.stock_transfer_lines.where('store_id').equals(storeId).delete(),
+    db.stock_ledger.where('store_id').equals(storeId).delete(),
+    db.stock_balances.where('store_id').equals(storeId).delete(),
+    db.item_price_history.where('store_id').equals(storeId).delete(),
+  ])
+
+  // Reset item prices to 0
+  await db.items.where('store_id').equals(storeId).modify({
+    buy_price: 0,
+    sell_price: 0,
+    min_sell_price: 0,
+    updated_at: new Date().toISOString()
+  })
+
+  // Reset customer and supplier balances
+  await db.customers.where('store_id').equals(storeId).modify({ balance: 0, points: 0 })
+  await db.suppliers.where('store_id').equals(storeId).modify({ balance: 0 })
+
+  await (db as any).local_carts?.clear?.()
+}
+
+// Tier 3: Purge transactions and stock levels only (Completely preserves items, barcodes, units, and buy/sell prices)
+export async function resetTransactionsKeepPricing(storeId: string): Promise<void> {
+  await Promise.all([
+    db.sales.where('store_id').equals(storeId).delete(),
+    db.sale_lines.where('store_id').equals(storeId).delete(),
+    db.sales_returns.where('store_id').equals(storeId).delete(),
+    db.sales_return_lines.where('store_id').equals(storeId).delete(),
+    db.purchases.where('store_id').equals(storeId).delete(),
+    db.purchase_lines.where('store_id').equals(storeId).delete(),
+    db.purchase_returns.where('store_id').equals(storeId).delete(),
+    db.purchase_return_lines.where('store_id').equals(storeId).delete(),
+    db.cash_transactions.where('store_id').equals(storeId).delete(),
+    db.cashier_shifts.where('store_id').equals(storeId).delete(),
+    db.stocktaking.where('store_id').equals(storeId).delete(),
+    db.stocktaking_lines.where('store_id').equals(storeId).delete(),
+    db.stock_transfers.where('store_id').equals(storeId).delete(),
+    db.stock_transfer_lines.where('store_id').equals(storeId).delete(),
+    db.stock_ledger.where('store_id').equals(storeId).delete(),
+    db.stock_balances.where('store_id').equals(storeId).delete(),
+  ])
+
+  // Reset customer and supplier balances
+  await db.customers.where('store_id').equals(storeId).modify({ balance: 0, points: 0 })
+  await db.suppliers.where('store_id').equals(storeId).modify({ balance: 0 })
+
+  await (db as any).local_carts?.clear?.()
+}
+
+// Delete all Sales Invoices and related cash inflow for a store
 export async function deleteStoreSalesInvoices(storeId: string): Promise<void> {
   await Promise.all([
     db.sales.where('store_id').equals(storeId).delete(),

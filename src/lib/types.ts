@@ -7,15 +7,26 @@ export type ItemType = 'stocked' | 'service' | 'non-stocked'
 export type SaleStatus = 'invoice' | 'draft' | 'cancelled' | 'void'
 export type PurchaseStatus = 'draft' | 'received' | 'cancelled' | 'void'
 export type PaymentStatus = 'paid' | 'partial' | 'unpaid'
-export type PaymentMethod = 'cash' | 'card' | 'bank-transfer'
+export type PaymentMethod = 'cash' | 'card' | 'bank-transfer' | 'credit'
 export type TransactionDirection = 'in' | 'out'
-export type MovementType = 'purchase' | 'sale' | 'return' | 'adjustment' | 'transfer' | 'opening'
+export type MovementType = 'purchase' | 'sale' | 'return' | 'adjustment' | 'transfer' | 'opening' | 'opening_balance'
 export type SyncStatus = 'pending' | 'synced' | 'failed'
 export type ShiftStatus = 'open' | 'closed'
 export type ReturnType = 'invoice' | 'free'
 export type ResourceType = 'page' | 'operation' | 'ui_element'
 export type StocktakingStatus = 'draft' | 'in_progress' | 'completed' | 'cancelled'
 export type TransferStatus = 'pending' | 'completed' | 'cancelled'
+
+// Scale Barcode Result
+export interface ScaleBarcodeResult {
+  isValid: boolean
+  prefix: string
+  itemCode: string
+  weight?: number // in KG (3 decimals, e.g. 0.250)
+  price?: number  // in currency units (e.g. 15.50)
+  type: 'weight' | 'price'
+  rawBarcode: string
+}
 
 // Dynamic Business Type Profiles
 export type BusinessType = 'supermarket' | 'general' | 'pharmacy' | 'clothing' | 'restaurant'
@@ -81,6 +92,7 @@ export interface Item {
   min_limit?: number
   min_stock?: number
   allow_decimal?: boolean // للوزن والكسور المنضبطة
+  scale_item_code?: string // كود الصنف في الميزان الإلكتروني (5 أرقام)
   image_url?: string
   search_text: string
   status: ItemStatus
@@ -359,15 +371,39 @@ export interface CashierShift {
   id: string
   store_id: string
   branch_id: string
+  shift_number?: string
   cashier_id: string
   cashier_name: string
   opening_balance: number
   closing_balance?: number
+  expected_cash?: number
   actual_cash?: number
   cash_difference?: number
+  total_cash_sales?: number
+  total_card_sales?: number
+  total_credit_sales?: number
+  total_cash_returns?: number
+  total_expenses?: number
+  total_invoices_count?: number
   status: ShiftStatus
+  notes?: string
   opened_at: string
   closed_at?: string
+}
+
+export interface ShiftReconciliation {
+  shift: CashierShift
+  openingBalance: number
+  totalCashSales: number
+  totalCardSales: number
+  totalCreditSales: number
+  totalCashReturns: number
+  totalExpenses: number
+  expectedCash: number
+  actualCash: number
+  difference: number
+  invoiceCount: number
+  status: 'surplus' | 'deficit' | 'balanced'
 }
 
 export interface CashTransaction {

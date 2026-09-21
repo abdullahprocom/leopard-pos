@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, ensureDefaultCategories } from '@/lib/db'
@@ -12,10 +12,10 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { ArrowRight, Plus, Trash2, Save, Scale, Pill, Check, FolderPlus, X, Shirt, Sparkles, AlertCircle, Calendar, Hash, Wand2, QrCode, History } from 'lucide-react'
+import { ArrowRight, Plus, Trash2, Save, Scale, AlertCircle, FolderPlus, Check, X, Pill, Shirt, Sparkles, Wand2, Boxes } from 'lucide-react'
 import { toast } from 'sonner'
-import type { ItemType, ItemStatus, BusinessType, ItemPriceHistory } from '@/lib/types'
-import { cleanPositiveQuantity, cleanPositivePrice, money, generateBarcode } from '@/lib/finance'
+import type { ItemType, ItemStatus } from '@/lib/types'
+import { cleanPositivePrice, cleanPositiveQuantity, money, generateBarcode } from '@/lib/finance'
 
 export default function NewItemPage() {
   const router = useRouter()
@@ -30,6 +30,7 @@ export default function NewItemPage() {
   const [itemType, setItemType] = useState<ItemType>('stocked')
   const [status, setStatus] = useState<ItemStatus>('active')
   const [allowDecimal, setAllowDecimal] = useState(false) // ميزان / أوزان وكسور منضبطة
+  const [scaleItemCode, setScaleItemCode] = useState('') // كود الصنف بالميزان الإلكتروني (PLU)
   
   // Inline category creation
   const [isAddingCategory, setIsAddingCategory] = useState(false)
@@ -62,12 +63,34 @@ export default function NewItemPage() {
     { level: 1, unit_name: isSupermarket ? 'قطعة' : isPharma ? 'علبة' : 'قطعة', qty_in_parent: 1, barcode: '', sell_price: '' }
   ])
   
-  // Inventory
+  // Inventory & Dynamic Opening Balance
   const [manageInventory, setManageInventory] = useState(true)
   const [openingStock, setOpeningStock] = useState('0')
+  const [openingStockByUnit, setOpeningStockByUnit] = useState<Record<number, string>>({ 0: '0' })
   const [lowStockAlert, setLowStockAlert] = useState('5')
 
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Computed total opening stock in base unit
+  const totalOpeningInBaseUnit = useMemo(() => {
+    if (units.length <= 1) {
+      const val = Number(openingStockByUnit[0] ?? openingStock ?? '0') || 0
+      return allowDecimal ? cleanPositiveQuantity(val, true) : Math.floor(Math.max(0, val))
+    }
+    let total = 0
+    let cumulative = 1
+    const factors: number[] = [1]
+    for (let i = 1; i < units.length; i++) {
+      const q = Math.max(1, Math.floor(Math.abs(Number(units[i].qty_in_parent) || 1)))
+      cumulative *= q
+      factors.push(cumulative)
+    }
+    for (let i = 0; i < units.length; i++) {
+      const qty = Math.max(0, Number(openingStockByUnit[i] || '0') || 0)
+      total += qty * factors[i]
+    }
+    return allowDecimal ? cleanPositiveQuantity(total, true) : Math.floor(total)
+  }, [units, openingStockByUnit, openingStock, allowDecimal])
 
   // Fetch categories & ensure defaults strictly isolated per store and business activity
   useEffect(() => {
@@ -210,7 +233,8 @@ export default function NewItemPage() {
         not_for_sale: false,
         low_stock_alert: Math.max(0, parseInt(lowStockAlert) || 0),
         allow_decimal: allowDecimal,
-        search_text: `${name} ${nameEn} ${finalSku} ${manufacturer} ${scientificName} ${activeIngredient} ${brand} ${size} ${color}`.toLowerCase(),
+        scale_item_code: allowDecimal && scaleItemCode.trim() ? scaleItemCode.trim() : undefined,
+        search_text: `${name} ${nameEn} ${finalSku} ${manufacturer} ${scaleItemCode} ${scientificName} ${activeIngredient} ${brand} ${size} ${color}`.toLowerCase(),
         status: status,
         // 💊 Pharmacy fields
         scientific_name: isPharma && scientificName.trim() ? scientificName.trim() : undefined,
@@ -253,6 +277,20 @@ export default function NewItemPage() {
             await db.item_barcodes.add(barcodeRecord)
             syncEngine.enqueueOperation('item_barcodes', 'INSERT', barcodeRecord)
           }
+        }
+
+        // Register scale PLU/item code in barcodes for fast lookup
+        if (allowDecimal && scaleItemCode.trim()) {
+          const scaleBarcodeRecord = {
+            id: crypto.randomUUID(),
+            store_id: currentStoreId,
+            item_id: itemId,
+            barcode: scaleItemCode.trim(),
+            is_primary: false,
+            created_at: now
+          }
+          await db.item_barcodes.add(scaleBarcodeRecord)
+          syncEngine.enqueueOperation('item_barcodes', 'INSERT', scaleBarcodeRecord)
         }
 
         // 4. Handle Dynamic Units of Measure (UOM) with cumulative conversion factors
@@ -313,9 +351,8 @@ export default function NewItemPage() {
         await db.item_price_history.add(priceHistoryRecord)
         syncEngine.enqueueOperation('item_price_history', 'INSERT', priceHistoryRecord)
 
-        // 6. Handle Opening Stock (in base unit)
-        const openStockVal = Math.max(0, Number(openingStock) || 0)
-        const cleanOpening = allowDecimal ? cleanPositiveQuantity(openStockVal, true) : Math.floor(openStockVal)
+        // 6. Handle Opening Stock (aggregated in base unit from all unit levels)
+        const cleanOpening = totalOpeningInBaseUnit
 
         const stockBalance = {
           id: crypto.randomUUID(),
@@ -339,7 +376,9 @@ export default function NewItemPage() {
             quantity: cleanOpening,
             unit_price: cleanBuy,
             total: money(cleanBuy * cleanOpening),
-            notes: 'رصيد افتتاحي عند إنشاء الصنف',
+            notes: units.length > 1 
+              ? `رصيد افتتاحي ديناميكي مجمع لجميع الوحدات (${cleanOpening} ${units[0]?.unit_name || 'وحدة'})`
+              : 'رصيد افتتاحي عند إنشاء الصنف',
             created_at: now
           }
           await db.stock_ledger.add(ledgerEntry)
@@ -483,15 +522,36 @@ export default function NewItemPage() {
 
                 {/* 🛒 Supermarket Decimal Scale Toggle (Shown only for Supermarket / General) */}
                 {(isSupermarket || businessType === 'general') && (
-                  <div className="flex items-center justify-between p-4 border border-blue-500/30 rounded-xl bg-blue-50/50 dark:bg-blue-950/20">
-                    <div className="space-y-1">
-                      <Label className="text-sm font-black flex items-center gap-2 text-blue-700 dark:text-blue-400">
-                        <Scale className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                        صنف ميزان ووزن بالجرامات (كجم)
-                      </Label>
-                      <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">للأجبان واللحوم والخضار: يتيح البيع بالجرام أو بالمبلغ المالي (مثال: بـ 10 ج)</p>
+                  <div className="space-y-4 p-4 border border-blue-500/30 rounded-xl bg-blue-50/50 dark:bg-blue-950/20">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <Label className="text-sm font-black flex items-center gap-2 text-blue-700 dark:text-blue-400">
+                          <Scale className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                          صنف ميزان ووزن بالجرامات (كجم)
+                        </Label>
+                        <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">للأجبان واللحوم والخضار: يتيح البيع بالجرام أو بالمبلغ المالي والتعرف على باركود الميزان</p>
+                      </div>
+                      <Switch checked={allowDecimal} onCheckedChange={handleScaleToggle} />
                     </div>
-                    <Switch checked={allowDecimal} onCheckedChange={handleScaleToggle} />
+
+                    {allowDecimal && (
+                      <div className="pt-3 border-t border-blue-200 dark:border-blue-900 space-y-2">
+                        <Label className="text-xs font-bold text-blue-900 dark:text-blue-300 block">
+                          كود الصنف في الميزان الإلكتروني (Scale PLU / Item Code)
+                        </Label>
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          value={scaleItemCode}
+                          onChange={e => setScaleItemCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 5))}
+                          placeholder="مثال: 00101 أو 101 (حتى 5 أرقام)"
+                          className="h-11 bg-white dark:bg-slate-900 font-mono font-bold text-sm border-blue-300 dark:border-blue-800"
+                        />
+                        <p className="text-[11px] text-blue-700 dark:text-blue-400 font-medium">
+                          الكود المبرمج داخل الميزان والمطبوع في باركود الوزن (EAN-13). عند مسحه بالكاشير، يتعرف النظام تلقائياً على الصنف والوزن والسعر بدون فتح نوافذ إضافية.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -735,27 +795,77 @@ export default function NewItemPage() {
               </div>
               
               {manageInventory && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="space-y-2">
-                    <Label className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">الرصيد الافتتاحي (بـ {units[0]?.unit_name || 'الوحدة الأساسية'})</Label>
-                    <Input 
-                      type="text" 
-                      inputMode="decimal"
-                      value={openingStock} 
-                      onKeyDown={(e) => {
-                        if (e.key === '-' || e.key === 'e' || e.key === '+' || e.key === 'Subtract') {
-                          e.preventDefault()
-                        }
-                      }}
-                      onChange={e => {
-                        const clean = e.target.value.replace(/[^0-9.]/g, '')
-                        setOpeningStock(clean === '' ? '0' : clean)
-                      }} 
-                      className="h-12 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 font-mono font-bold" 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">تنبيه نقص المخزون</Label>
+                <div className="space-y-5">
+                  {units.length > 1 ? (
+                    <div className="p-4 rounded-2xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/60 space-y-4">
+                      <div>
+                        <Label className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
+                          <Boxes className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                          الرصيد الافتتاحي الديناميكي (تفكيك عكسي لكل مستوى وحدة)
+                        </Label>
+                        <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 font-medium leading-relaxed">
+                          أدخل الكميات المفككة المتوفرة لديك حالياً في المحل لكل وحدة على حدة (مثلاً: 5 أشرطة و 4 حبات بدون علب كاملة).
+                          يقوم النظام بتجميعها آلياً بأصغر وحدة قياس دون اشتراط وجود المستوى الأعلى.
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                        {units.map((u, idx) => (
+                          <div key={idx} className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2">
+                            <span className="text-xs font-bold text-slate-700 dark:text-slate-200 block">
+                              كمية ({u.unit_name || `المستوى ${idx + 1}`})
+                              {idx > 0 && <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold mr-1">[{u.qty_in_parent} من السابقة]</span>}
+                            </span>
+                            <Input
+                              type="text"
+                              inputMode="numeric"
+                              value={openingStockByUnit[idx] || ''}
+                              placeholder="0"
+                              onChange={e => {
+                                const val = e.target.value.replace(/[^0-9]/g, '')
+                                setOpeningStockByUnit(prev => ({ ...prev, [idx]: val }))
+                              }}
+                              className="h-11 bg-slate-50 dark:bg-slate-800 font-mono font-bold text-center text-sm"
+                            />
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex items-center justify-between text-xs font-bold text-emerald-900 dark:text-emerald-200">
+                        <span>إجمالي الرصيد المحسوب بالوحدة الأساسية ({units[0]?.unit_name || 'قطعة'}):</span>
+                        <span className="text-lg font-mono font-black text-emerald-700 dark:text-emerald-400">
+                          {totalOpeningInBaseUnit} {units[0]?.unit_name || 'قطعة'}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">
+                        الرصيد الافتتاحي (بـ {units[0]?.unit_name || 'الوحدة الأساسية'})
+                      </Label>
+                      <Input 
+                        type="text" 
+                        inputMode="decimal"
+                        value={openingStockByUnit[0] ?? openingStock} 
+                        onKeyDown={(e) => {
+                          if (e.key === '-' || e.key === 'e' || e.key === '+' || e.key === 'Subtract') {
+                            e.preventDefault()
+                          }
+                        }}
+                        onChange={e => {
+                          const clean = allowDecimal ? e.target.value.replace(/[^0-9.]/g, '') : e.target.value.replace(/[^0-9]/g, '')
+                          setOpeningStock(clean === '' ? '0' : clean)
+                          setOpeningStockByUnit({ 0: clean })
+                        }} 
+                        className="h-12 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 font-mono font-bold" 
+                      />
+                    </div>
+                  )}
+
+                  <div className="space-y-2 max-w-sm">
+                    <Label className="text-slate-900 dark:text-white font-bold text-sm mb-2 block">
+                      تنبيه نقص المخزون (بالوحدة الأساسية: {units[0]?.unit_name || 'قطعة'})
+                    </Label>
                     <Input 
                       type="text" 
                       inputMode="numeric"

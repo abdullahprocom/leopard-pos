@@ -1,7 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { db, resetStoreEntireData, deleteStoreSalesInvoices } from '@/lib/db'
+import { 
+  db, 
+  resetStoreEntireData, 
+  resetTransactionsKeepItems, 
+  resetTransactionsKeepPricing, 
+  deleteStoreSalesInvoices 
+} from '@/lib/db'
 import { syncEngine, DEFAULT_STORE_UUID, DEFAULT_USER_UUID, getTenantInfo } from '@/lib/sync-engine'
 import { useStore } from '@/lib/store-context'
 import { useAuth } from '@/lib/auth-context'
@@ -16,22 +22,35 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 export default function SettingsPage() {
   const { role } = useAuth()
-  const { storeId, branchId, storeName, setStoreName, businessType, setBusinessType, purgeAndReseedCategories, activationToken, activateOfflineSystem, isActivated } = useStore()
+  const { 
+    storeId, 
+    branchId, 
+    storeName, 
+    setStoreName, 
+    businessType, 
+    setBusinessType, 
+    purgeAndReseedCategories, 
+    activationToken, 
+    activateOfflineSystem, 
+    isActivated 
+  } = useStore()
 
+  // Protect sensitive settings: Only admin can access
   if (role !== 'admin') {
     return (
-      <div className="flex flex-col items-center justify-center p-12 bg-rose-500/10 border-2 border-rose-500/30 rounded-3xl text-center space-y-4 max-w-xl mx-auto my-12" dir="rtl">
-        <div className="w-16 h-16 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center border border-rose-500/30">
-          <Lock className="w-8 h-8" />
+      <div className="p-8 text-center" dir="rtl">
+        <div className="inline-flex p-4 rounded-2xl bg-amber-500/10 text-amber-500 mb-4">
+          <ShieldAlert className="w-10 h-10" />
         </div>
-        <h2 className="text-xl font-black text-rose-500">غير مصرح لك بالوصول إلى إعدادات النظام</h2>
-        <p className="text-sm font-semibold text-slate-400 leading-relaxed">
-          هذه الشاشة مقتصرة حصرياً على المدير العام (Admin) لتغيير النشاط وإعدادات الطابعات والبيانات.
+        <h2 className="text-xl font-black text-slate-900 dark:text-white">غير مصرح بالدخول</h2>
+        <p className="text-sm text-slate-500 mt-2 font-semibold">
+          صفحة الإعدادات وتصفير البيانات مخصصة لمدير النظام العام (Admin) فقط.
         </p>
       </div>
     )
   }
-  const [localStoreName, setLocalStoreName] = useState(storeName)
+
+  const [localStoreName, setLocalStoreName] = useState(storeName || '')
   const [localBusinessType, setLocalBusinessType] = useState<BusinessType>(businessType)
   const [currency, setCurrency] = useState('EGP')
   const [taxRate, setTaxRate] = useState('0')
@@ -41,28 +60,65 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [syncStatus, setSyncStatus] = useState({ pending: 0, synced: 0, failed: 0 })
 
-  const [isResetAllModalOpen, setIsResetAllModalOpen] = useState(false)
-  const [isResetSalesModalOpen, setIsResetSalesModalOpen] = useState(false)
+  // 3-Tier Reset Modals
+  const [isResetTier1ModalOpen, setIsResetTier1ModalOpen] = useState(false) // Full Factory Reset
+  const [isResetTier2ModalOpen, setIsResetTier2ModalOpen] = useState(false) // Reset Transactions Keep Items
+  const [isResetTier3ModalOpen, setIsResetTier3ModalOpen] = useState(false) // Reset Transactions Keep Pricing
+  const [isResetSalesModalOpen, setIsResetSalesModalOpen] = useState(false) // Quick Sales Invoices Reset
   const [isExecutingReset, setIsExecutingReset] = useState(false)
 
-  const handleExecuteResetAll = async () => {
+  // Tier 1: Full Factory Reset
+  const handleExecuteResetTier1 = async () => {
     try {
       setIsExecutingReset(true)
       const tenant = getTenantInfo(localBusinessType)
       await resetStoreEntireData(tenant.storeId, localBusinessType)
-      toast.success('تم حذف وتصفير جميع بيانات المنظومة بالكامل بنجاح كأنها جديدة!')
-      setIsResetAllModalOpen(false)
-      setTimeout(() => {
-        window.location.reload()
-      }, 800)
+      toast.success('تم تنفيذ التدمير الشامل وإعادة ضبط المصنع كأن المنظومة جديدة تماماً!')
+      setIsResetTier1ModalOpen(false)
+      setTimeout(() => window.location.reload(), 800)
     } catch (err: any) {
       console.error(err)
-      toast.error('حدث خطأ أثناء تصفير البيانات: ' + err.message)
+      toast.error('حدث خطأ أثناء ضبط المصنع: ' + err.message)
     } finally {
       setIsExecutingReset(false)
     }
   }
 
+  // Tier 2: Reset Transactions Keep Items Structure
+  const handleExecuteResetTier2 = async () => {
+    try {
+      setIsExecutingReset(true)
+      const tenant = getTenantInfo(localBusinessType)
+      await resetTransactionsKeepItems(tenant.storeId)
+      toast.success('تم تصفير الحسابات والعمليات مع الحفاظ على هيكل الأصناف والباركودات!')
+      setIsResetTier2ModalOpen(false)
+      setTimeout(() => window.location.reload(), 800)
+    } catch (err: any) {
+      console.error(err)
+      toast.error('حدث خطأ أثناء تصفير الحركات: ' + err.message)
+    } finally {
+      setIsExecutingReset(false)
+    }
+  }
+
+  // Tier 3: Reset Transactions Keep Pricing
+  const handleExecuteResetTier3 = async () => {
+    try {
+      setIsExecutingReset(true)
+      const tenant = getTenantInfo(localBusinessType)
+      await resetTransactionsKeepPricing(tenant.storeId)
+      toast.success('تم تصفير الحركات مع الحفاظ الكامل على الأصناف والباركودات والأسعار!')
+      setIsResetTier3ModalOpen(false)
+      setTimeout(() => window.location.reload(), 800)
+    } catch (err: any) {
+      console.error(err)
+      toast.error('حدث خطأ أثناء تصفير الحركات: ' + err.message)
+    } finally {
+      setIsExecutingReset(false)
+    }
+  }
+
+  // Quick Sales Reset
   const handleExecuteResetSales = async () => {
     try {
       setIsExecutingReset(true)
@@ -70,9 +126,7 @@ export default function SettingsPage() {
       await deleteStoreSalesInvoices(tenant.storeId)
       toast.success('تم مسح وتصفير جميع فواتير المبيعات بنجاح!')
       setIsResetSalesModalOpen(false)
-      setTimeout(() => {
-        window.location.reload()
-      }, 800)
+      setTimeout(() => window.location.reload(), 800)
     } catch (err: any) {
       console.error(err)
       toast.error('حدث خطأ أثناء مسح الفواتير: ' + err.message)
@@ -456,56 +510,103 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* 6. Danger Zone & Factory Reset Card */}
+        {/* 6. Danger Zone: 3-Tier Database Reset & System Purge */}
         <Card className="lg:col-span-2 border-rose-200 dark:border-rose-900/50 bg-rose-50/20 dark:bg-rose-950/10 shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
               <ShieldAlert className="h-5 w-5 text-rose-600 dark:text-rose-400" />
-              منطقة العمليات الحساسة وتصفير البيانات (Danger Zone)
+              منطقة العمليات الحساسة ونظام تصفير البيانات ثلاثي المستويات (3-Tier Purge)
             </CardTitle>
             <CardDescription className="text-slate-600 dark:text-slate-400">
-              تصفير الفواتير أو حذف كافة بيانات المنظومة بالكامل وإعادتها لحالة المصنع كأنها جديدة
+              خيارات متدرجة لتصفير النظام قبل تسليمه للعميل أو لبدء سنة مالية جديدة بأمان تام
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            
-            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-900/60 flex items-center justify-between gap-4 flex-wrap">
+
+            {/* Quick Option: Sales Invoices Only */}
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4 flex-wrap">
               <div>
                 <p className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
-                  <Trash2 className="w-4 h-4 text-amber-500" />
-                  حذف وتصفير سجل فواتير المبيعات فقط
+                  <Trash2 className="w-4 h-4 text-slate-500" />
+                  مسح فواتير المبيعات فقط
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  مسح كافة فواتير المبيعات وحركات النقدية المرتبطة بها وتصفير الإحصائيات مع الإبقاء على الأصناف والمخزون
+                  حذف كافة فواتير المبيعات مع الإبقاء على المخزون والأصناف والمشتريات والعملاء
                 </p>
               </div>
 
               <Button
                 type="button"
                 onClick={() => setIsResetSalesModalOpen(true)}
-                className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs h-11 px-5 rounded-xl cursor-pointer shadow-md shadow-amber-600/20"
+                variant="outline"
+                className="font-bold text-xs h-11 px-5 rounded-xl cursor-pointer border-slate-300 dark:border-slate-700"
               >
-                تصفير الفواتير
+                تصفير المبيعات فقط
               </Button>
             </div>
 
-            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-rose-300 dark:border-rose-800 flex items-center justify-between gap-4 flex-wrap">
+            {/* Tier 3: Reset Transactions Keep Pricing */}
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-800/80 flex items-center justify-between gap-4 flex-wrap">
               <div>
-                <p className="text-sm font-black text-rose-600 dark:text-rose-400 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400" />
-                  إعادة ضبط المصنع وحذف جميع بيانات النشاط بالكامل (Factory Reset)
+                <p className="text-sm font-black text-amber-600 dark:text-amber-400 flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-600 flex items-center justify-center text-xs font-black">3</span>
+                  المستوى الثالث: تصفير الحركات مع الحفاظ على التكويد والأسعار
                 </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  حذف شامل لجميع الأصناف، المخزون، الموظفين، المشتريات، المبيعات، والعملاء وإرجاع النظام طازجاً كأنه لم يُستخدم
+                <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                  ✅ <strong>يُبقي:</strong> أسماء الأصناف، الباركودات، الوحدات، التصنيفات، وأسعار الشراء والبيع الثابتة. <br />
+                  ❌ <strong>يحذف:</strong> فواتير البيع والشراء، والورديات، وحركات المخزن، ويصفر رصيد المخزون إلى 0.
                 </p>
               </div>
 
               <Button
                 type="button"
-                onClick={() => setIsResetAllModalOpen(true)}
+                onClick={() => setIsResetTier3ModalOpen(true)}
+                className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs h-11 px-5 rounded-xl cursor-pointer shadow-md shadow-amber-600/20"
+              >
+                تصفير الحركات (بقاء الأسعار)
+              </Button>
+            </div>
+
+            {/* Tier 2: Reset Transactions Keep Items Structure */}
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-orange-300 dark:border-orange-800/80 flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <p className="text-sm font-black text-orange-600 dark:text-orange-400 flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-orange-500/20 text-orange-600 flex items-center justify-center text-xs font-black">2</span>
+                  المستوى الثاني: تصفير الحسابات مع إبقاء هيكل الأصناف
+                </p>
+                <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                  ✅ <strong>يُبقي:</strong> أسماء الأصناف، الباركودات، الوحدات، التصنيفات، وبيانات العملاء والموردين. <br />
+                  ❌ <strong>يحذف:</strong> كافة العمليات المالية والفواتير والورديات ويصفر الأسعار والأرصدة إلى 0.
+                </p>
+              </div>
+
+              <Button
+                type="button"
+                onClick={() => setIsResetTier2ModalOpen(true)}
+                className="bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs h-11 px-5 rounded-xl cursor-pointer shadow-md shadow-orange-600/20"
+              >
+                تصفير شامل (بقاء الأصناف)
+              </Button>
+            </div>
+
+            {/* Tier 1: Full Factory Reset */}
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-rose-400 dark:border-rose-800 flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <p className="text-sm font-black text-rose-600 dark:text-rose-400 flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400" />
+                  المستوى الأول: تدمير شامل وإعادة ضبط المصنع (Factory Reset)
+                </p>
+                <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                  مسح كامل لكافة الأصناف والمخزون والفواتير والعملاء والموردين والموظفين — المنظومة تعود كأنها مثبتة حديثاً
+                </p>
+              </div>
+
+              <Button
+                type="button"
+                onClick={() => setIsResetTier1ModalOpen(true)}
                 className="bg-rose-600 hover:bg-rose-700 text-white font-black text-xs h-11 px-5 rounded-xl cursor-pointer shadow-lg shadow-rose-600/30"
               >
-                تصفير شامل للبيانات (Factory Reset)
+                تدمير شامل (Factory Reset)
               </Button>
             </div>
 
@@ -514,18 +615,18 @@ export default function SettingsPage() {
 
       </div>
 
-      {/* Modal: Store Factory Reset Confirmation */}
-      {isResetAllModalOpen && (
+      {/* Modal: Tier 1 Full Factory Reset */}
+      {isResetTier1ModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 border-2 border-rose-500 rounded-3xl p-6 w-full max-w-lg shadow-2xl space-y-5 text-right" dir="rtl">
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
               <h3 className="text-lg font-black text-rose-600 dark:text-rose-400 flex items-center gap-2">
                 <AlertTriangle className="w-6 h-6 text-rose-600 dark:text-rose-400 animate-bounce" />
-                تأكيد حذف وتصفير جميع بيانات النشاط التجاري
+                المستوى 1: تدمير شامل وضبط المصنع (Factory Reset)
               </h3>
               <button
                 type="button"
-                onClick={() => setIsResetAllModalOpen(false)}
+                onClick={() => setIsResetTier1ModalOpen(false)}
                 className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center cursor-pointer"
               >
                 <X className="w-4 h-4" />
@@ -534,13 +635,12 @@ export default function SettingsPage() {
 
             <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 space-y-2 text-xs font-bold text-rose-950 dark:text-rose-200 leading-relaxed">
               <p className="text-sm font-black text-rose-600 dark:text-rose-400">⚠️ تحذير نهائي لا يمكن التراجع عنه:</p>
-              <p>هل أنت متأكد تماماً أنك تريد حذف وتصفير جميع بيانات النشاط التجاري بالكامل؟</p>
+              <p>سيتم مسح قاعدة البيانات بالكامل وإعادة المنظومة كأنها طازجة تماماً:</p>
               <ul className="list-disc list-inside space-y-1 text-slate-700 dark:text-slate-300 font-semibold">
                 <li>سيتم مسح كافة الأصناف والباركودات ووحدات القياس.</li>
                 <li>سيتم تصفير المخزون بالكامل وحركات كشف الحساب.</li>
-                <li>سيتم حذف كافة فواتير المبيعات والمشتريات والمصروفات.</li>
+                <li>سيتم حذف كافة فواتير المبيعات والمشتريات والمصروفات والورديات.</li>
                 <li>سيتم حذف حسابات العملاء والموردين والموظفين.</li>
-                <li>سيعود النظام إلى الحالة الأصلية الطازجة كأنه برنامج جديد لم يُستخدم قط.</li>
               </ul>
             </div>
 
@@ -549,7 +649,7 @@ export default function SettingsPage() {
                 type="button"
                 variant="outline"
                 disabled={isExecutingReset}
-                onClick={() => setIsResetAllModalOpen(false)}
+                onClick={() => setIsResetTier1ModalOpen(false)}
                 className="flex-1 h-12 rounded-xl text-sm font-bold border-slate-300 dark:border-slate-700"
               >
                 إلغاء وتراجع
@@ -557,10 +657,113 @@ export default function SettingsPage() {
               <Button
                 type="button"
                 disabled={isExecutingReset}
-                onClick={handleExecuteResetAll}
+                onClick={handleExecuteResetTier1}
                 className="flex-1 h-12 rounded-xl text-sm font-black bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-600/30"
               >
-                {isExecutingReset ? 'جاري التصفير والحذف...' : 'نعم، متأكد واحذف كل شيء'}
+                {isExecutingReset ? 'جاري التدمير والتهيئة...' : 'نعم، مسح شامل لكل شيء'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Tier 2 Reset Keep Items */}
+      {isResetTier2ModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border-2 border-orange-500 rounded-3xl p-6 w-full max-w-lg shadow-2xl space-y-5 text-right" dir="rtl">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <h3 className="text-lg font-black text-orange-600 dark:text-orange-400 flex items-center gap-2">
+                <AlertTriangle className="w-6 h-6 text-orange-500" />
+                المستوى 2: تصفير الحسابات مع إبقاء هيكل الأصناف
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsResetTier2ModalOpen(false)}
+                className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-900 space-y-2 text-xs font-bold text-orange-950 dark:text-orange-200 leading-relaxed">
+              <p className="text-sm font-black text-orange-600 dark:text-orange-400">⚠️ ماذا سيحدث في هذا المستوى:</p>
+              <p>سيتم تصفير كافة العمليات المالية والحسابية مع الإبقاء على الأصناف:</p>
+              <ul className="list-disc list-inside space-y-1 text-slate-700 dark:text-slate-300 font-semibold">
+                <li>✅ تبقى أسماء الأصناف والباركودات والوحدات والتصنيفات.</li>
+                <li>❌ تُحذف جميع فواتير البيع والشراء والورديات وسجلات المخزن.</li>
+                <li>❌ يتم تصفير أرصدة المخزون إلى صفر، وتصفير أسعار الشراء والبيع لتحديدها لاحقاً.</li>
+                <li>❌ يتم تصفير أرصدة العملاء والموردين.</li>
+              </ul>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isExecutingReset}
+                onClick={() => setIsResetTier2ModalOpen(false)}
+                className="flex-1 h-12 rounded-xl text-sm font-bold border-slate-300 dark:border-slate-700"
+              >
+                إلغاء وتراجع
+              </Button>
+              <Button
+                type="button"
+                disabled={isExecutingReset}
+                onClick={handleExecuteResetTier2}
+                className="flex-1 h-12 rounded-xl text-sm font-black bg-orange-600 hover:bg-orange-700 text-white shadow-lg shadow-orange-600/30"
+              >
+                {isExecutingReset ? 'جاري التصفير...' : 'تأكيد تصفير الحسابات'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Tier 3 Reset Keep Pricing */}
+      {isResetTier3ModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border-2 border-amber-500 rounded-3xl p-6 w-full max-w-lg shadow-2xl space-y-5 text-right" dir="rtl">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <h3 className="text-lg font-black text-amber-600 dark:text-amber-400 flex items-center gap-2">
+                <Trash2 className="w-6 h-6 text-amber-500" />
+                المستوى 3: تصفير الحركات مع الحفاظ على التكويد والأسعار
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsResetTier3ModalOpen(false)}
+                className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 space-y-2 text-xs font-bold text-amber-950 dark:text-amber-200 leading-relaxed">
+              <p className="text-sm font-black text-amber-600 dark:text-amber-400">ℹ️ الوضع المثالي لبدء سنة مالية جديدة أو تسليم المنظومة بعد التكويد:</p>
+              <ul className="list-disc list-inside space-y-1 text-slate-700 dark:text-slate-300 font-semibold">
+                <li>✅ <strong>الحفاظ الكامل</strong> على أسماء الأصناف، الباركود، الوحدات، وأسعار الشراء والبيع الثابتة.</li>
+                <li>❌ حذف كافة فواتير المبيعات، المشتريات، المرتجعات، والورديات.</li>
+                <li>❌ تصفير أرصدة المخزون بالكامل (تصبح 0) لتسجيل رصيد أول مدة جديد.</li>
+                <li>❌ تصفير أرصدة العملاء والموردين.</li>
+              </ul>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isExecutingReset}
+                onClick={() => setIsResetTier3ModalOpen(false)}
+                className="flex-1 h-12 rounded-xl text-sm font-bold border-slate-300 dark:border-slate-700"
+              >
+                إلغاء وتراجع
+              </Button>
+              <Button
+                type="button"
+                disabled={isExecutingReset}
+                onClick={handleExecuteResetTier3}
+                className="flex-1 h-12 rounded-xl text-sm font-black bg-amber-600 hover:bg-amber-700 text-white shadow-lg shadow-amber-600/30"
+              >
+                {isExecutingReset ? 'جاري التصفير...' : 'تأكيد تصفير الحركات'}
               </Button>
             </div>
           </div>
@@ -570,10 +773,10 @@ export default function SettingsPage() {
       {/* Modal: Sales Invoices Reset Confirmation */}
       {isResetSalesModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 border-2 border-amber-500 rounded-3xl p-6 w-full max-w-lg shadow-2xl space-y-5 text-right" dir="rtl">
+          <div className="bg-white dark:bg-slate-900 border-2 border-slate-400 rounded-3xl p-6 w-full max-w-lg shadow-2xl space-y-5 text-right" dir="rtl">
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-              <h3 className="text-lg font-black text-amber-600 dark:text-amber-400 flex items-center gap-2">
-                <Trash2 className="w-6 h-6 text-amber-500" />
+              <h3 className="text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                <Trash2 className="w-6 h-6 text-slate-500" />
                 تأكيد حذف وتصفير سجل فواتير المبيعات
               </h3>
               <button
@@ -585,8 +788,8 @@ export default function SettingsPage() {
               </button>
             </div>
 
-            <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 space-y-2 text-xs font-bold text-amber-950 dark:text-amber-200 leading-relaxed">
-              <p className="text-sm font-black text-amber-600 dark:text-amber-400">⚠️ تأكيد مسح الفواتير:</p>
+            <div className="p-4 rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-2 text-xs font-bold text-slate-900 dark:text-slate-200 leading-relaxed">
+              <p className="text-sm font-black text-slate-700 dark:text-slate-300">⚠️ تأكيد مسح الفواتير:</p>
               <p>سيتم حذف كافة فواتير المبيعات المسجلة وتصفير إحصائيات المبيعات، مع الحفاظ على الأصناف والمخزون الحالي دون تغيير.</p>
             </div>
 
@@ -604,7 +807,7 @@ export default function SettingsPage() {
                 type="button"
                 disabled={isExecutingReset}
                 onClick={handleExecuteResetSales}
-                className="flex-1 h-12 rounded-xl text-sm font-black bg-amber-600 hover:bg-amber-700 text-white shadow-lg shadow-amber-600/30"
+                className="flex-1 h-12 rounded-xl text-sm font-black bg-slate-800 hover:bg-slate-700 text-white shadow-lg"
               >
                 {isExecutingReset ? 'جاري المسح...' : 'نعم، امسح الفواتير'}
               </Button>
